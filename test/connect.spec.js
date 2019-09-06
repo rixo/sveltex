@@ -4,7 +4,7 @@ import assert from 'assert'
 import { fake } from 'sinon'
 
 import { createConnector } from '@/connect'
-import { isFunction } from '@/util/fp'
+import { isFunction, isStream } from '@/util/fp'
 
 const double = x => 2 * x
 
@@ -61,7 +61,6 @@ describe('connect', () => {
   let context
   let lifecycle
   let connect
-  let configure
 
   beforeEach(() => {
     context = FakeContext()
@@ -317,6 +316,81 @@ describe('connect', () => {
         assert.equal(value$.unsubscribeCount, 4)
         assert.equal(value$.subscribeCount, 4)
       })
+    })
+  })
+
+  describe('sink$', () => {
+    it('is passed as only argument to write-only services', () => {
+      const factory = fake() // can't use a fake as provider because of fn.length
+      function _foo(sink$) {
+        assert(isStream(sink$), 'sink$ is a stream')
+        assert.equal(arguments.length, 1)
+        factory()
+      }
+      assert(factory.notCalled)
+      connect(_foo)
+      assert(factory.calledOnce)
+    })
+
+    it('is passed as only argument to read/write services', () => {
+      const factory = fake() // can't use a fake as provider because of fn.length
+      function _foo$$(sink$) {
+        assert(isStream(sink$), 'sink$ is a stream')
+        assert.equal(arguments.length, 1)
+        factory()
+        return of(1)
+      }
+      assert(factory.notCalled)
+      connect(_foo$$)
+      assert(factory.calledOnce)
+    })
+
+    it('is not passed to read-only services', () => {
+      const factory = fake() // can't use a fake as provider because of fn.length
+      function _foo$$() {
+        assert.equal(arguments.length, 0)
+        factory()
+        return of(1)
+      }
+      assert(factory.notCalled)
+      connect(_foo$$)
+      assert(factory.calledOnce)
+    })
+
+    it('can be piped to source$', () => {
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      const foo$ = connect(_foo$$)
+      const next = fake()
+      foo$.subscribe(next)
+      assert(next.notCalled)
+      foo$.set(42)
+      assert(next.calledOnceWith(84))
+    })
+
+    it('can be written before the first read', () => {
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      const foo$ = connect(_foo$$)
+      // write
+      foo$.set(42)
+      // first read
+      const next = fake()
+      foo$.subscribe(next)
+      assert(next.calledOnceWith(84))
+      // second read
+      const next2 = fake()
+      foo$.subscribe(next2)
+      assert(next.calledOnceWith(84))
+    })
+
+    it('does not emit before the first write', () => {
+      const next = fake()
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      const foo$ = connect(_foo$$)
+      foo$.subscribe(next)
+      assert(next.notCalled)
+      // write
+      foo$.set(42)
+      assert(next.calledOnceWith(84))
     })
   })
 })
