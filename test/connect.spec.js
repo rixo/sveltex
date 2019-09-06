@@ -3,7 +3,7 @@ import { EMPTY, NEVER, of, concat, ReplaySubject } from 'rxjs'
 import assert from 'assert'
 import { fake } from 'sinon'
 
-import { createConnector, createAllOptions } from '@/connect'
+import { createConnector } from '@/connect'
 import { isFunction } from '@/util/fp'
 
 const double = x => 2 * x
@@ -56,125 +56,6 @@ const spyObservable = (source$, end$ = NEVER) => {
     unsubscribeCount: 0,
   })
 }
-
-describe.skip('createAllOptions', () => {
-  let context
-  let env
-
-  let resolveOptions
-  let configure
-
-  const key = () => {}
-
-  beforeEach(() => {
-    context = FakeContext()
-    env = context
-    const manager = createAllOptions(env)
-    resolveOptions = manager.resolveOptions
-    configure = manager.configure
-  })
-
-  it('is a function', () => {
-    assert.equal(typeof createAllOptions, 'function')
-  })
-
-  describe('resolveOptions', () => {
-    it('resolves to the same options$ in same context', () => {
-      const options$1 = resolveOptions(key)
-      assert.ok(options$1)
-      const options$2 = resolveOptions(key)
-      assert.equal(options$1, options$2)
-    })
-
-    it('resolves to another options$ in another context', () => {
-      const options$1 = resolveOptions(key)
-      assert.ok(options$1)
-      context.clear()
-      {
-        // const { resolveOptions } = createAllOptions(env)
-        const options$2 = resolveOptions(key)
-        assert.notEqual(options$1, options$2)
-      }
-    })
-
-    it('emits undefined when not configured', () => {
-      const options$ = resolveOptions(key)
-      const next = fake()
-      assert.equal(next.callCount, 0)
-      options$.subscribe(next)
-      assert.equal(next.callCount, 1)
-      assert.strictEqual(next.lastArg, undefined)
-    })
-
-    it('emits last options from newly resolved options$', () => {
-      {
-        const options$ = resolveOptions(key)
-        const next = fake()
-        assert.equal(next.callCount, 0)
-        options$.subscribe(next)
-        assert.equal(next.callCount, 1)
-      }
-      {
-        const options$ = resolveOptions(key)
-        const next = fake()
-        assert.equal(next.callCount, 0)
-        options$.subscribe(next)
-        assert.equal(next.callCount, 1)
-      }
-    })
-
-    it('reemits last options to late subscribers', () => {
-      const options$ = resolveOptions(key)
-      const next = fake()
-      assert.equal(next.callCount, 0)
-      options$.subscribe(next)
-      assert.equal(next.callCount, 1)
-      const next2 = fake()
-      options$.subscribe(next2)
-      assert.equal(next.callCount, 1)
-    })
-
-    it('feeds new configurations to options$', () => {
-      const options$ = resolveOptions(key)
-      const next = fake()
-      assert.equal(next.callCount, 0)
-      options$.subscribe(next)
-      assert.equal(next.callCount, 1)
-      assert.equal(next.lastArg, undefined)
-      const value1 = {}
-      configure(key, value1)
-      assert.equal(next.callCount, 2)
-      assert.equal(next.lastArg, value1)
-    })
-
-    it('feeds new configurations to late options$', () => {
-      const options$1 = resolveOptions(key)
-      const next1 = fake()
-      const next2 = fake()
-      const value1 = {}
-      const value2 = {}
-
-      options$1.subscribe(next1)
-      configure(key, value1)
-
-      assert.equal(next1.callCount, 2)
-      assert.equal(next1.lastArg, value1)
-
-      const options$2 = resolveOptions(key)
-      options$2.subscribe(next2)
-
-      assert.equal(next2.callCount, 1)
-      assert.equal(next2.lastArg, value1)
-
-      configure(key, value2)
-
-      assert.equal(next2.callCount, 2)
-      assert.equal(next2.lastArg, value2)
-      assert.equal(next1.callCount, 3)
-      assert.equal(next1.lastArg, value2)
-    })
-  })
-})
 
 describe('connect', () => {
   let context
