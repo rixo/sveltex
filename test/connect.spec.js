@@ -288,7 +288,7 @@ describe('connect', () => {
         assert.equal(value$.unsubscribeCount, 1)
       })
 
-      it('is resubscribed when downstream is resubscribed after dipose', () => {
+      it('is resubscribed when downstream is resubscribed after dispose', () => {
         const next = fake()
         const value$ = spyObservable(of(42))
         const foo$$ = () =>
@@ -391,6 +391,61 @@ describe('connect', () => {
       // write
       foo$.set(42)
       assert(next.calledOnceWith(84))
+    })
+
+    it('flushes all past values to first reader', () => {
+      const next = fake()
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      const foo$ = connect(_foo$$)
+      ;[1, 2, 3].forEach(x => foo$.set(x))
+      assert(next.notCalled)
+      foo$.subscribe(next)
+      assert.equal(next.callCount, 3)
+      assert.deepEqual(next.args, [[2], [4], [6]])
+    })
+
+    it('becomes hot when first reader subscribe', () => {
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      const foo$ = connect(_foo$$)
+      ;[1, 2, 3].forEach(x => foo$.set(x))
+      // first reader (flush)
+      const next = fake()
+      assert(next.notCalled)
+      foo$.subscribe(next)
+      assert.equal(next.callCount, 3)
+      assert.deepEqual(next.args, [[2], [4], [6]])
+      // second reader
+      const next2 = fake()
+      foo$.subscribe(next2)
+      assert(next2.notCalled)
+      foo$.set(42)
+      assert.equal(next.callCount, 4)
+      assert.equal(next.lastArg, 84)
+      assert(next2.calledOnceWith(84))
+    })
+
+    it('remains hot on subsequent connections', () => {
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      // first connectiton
+      {
+        const foo$ = connect(_foo$$)
+        ;[1, 2, 3].forEach(x => foo$.set(x))
+        const next = fake()
+        assert(next.notCalled)
+        foo$.subscribe(next)
+        assert.equal(next.callCount, 3)
+        assert.deepEqual(next.args, [[2], [4], [6]])
+      }
+      // second connection
+      {
+        const next = fake()
+        const foo$ = connect(_foo$$)
+        foo$.subscribe(next)
+        assert(next.notCalled)
+        foo$.set(42)
+        assert.equal(next.callCount, 1)
+        assert.equal(next.lastArg, 84)
+      }
     })
   })
 })
