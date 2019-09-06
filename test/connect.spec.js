@@ -130,13 +130,13 @@ describe('connect', () => {
     assert.equal(nextA.lastArg, 54)
   })
 
-  describe('mixed source & sink', () => {
+  describe('with mixed source & sink', () => {
     it('returns the source$', () => {
       // eslint-disable-next-line no-unused-vars
       const _foo$$ = sink$ => of(42)
       const foo$ = connect(_foo$$)
       assert.ok(foo$)
-      assert(isFunction(foo$.subscribe), 'foo$ is a stream')
+      assert(isStream(foo$), 'foo$ is a stream')
     })
 
     it('returns an object that can be destructured as [sink, source$]', () => {
@@ -145,7 +145,7 @@ describe('connect', () => {
       const [foo, foo$] = connect(_foo$$)
       assert(isFunction(foo), 'foo is a function')
       assert.ok(foo$)
-      assert(isFunction(foo$.subscribe), 'foo$ is a stream')
+      assert(isStream(foo$), 'foo$ is a stream')
     })
 
     it('returns an object that can be destructured as {_, $}', () => {
@@ -154,7 +154,7 @@ describe('connect', () => {
       const { _: foo, $: foo$ } = connect(_foo$$)
       assert.equal(typeof foo, 'function')
       assert.ok(foo$)
-      assert.equal(typeof foo$.subscribe, 'function')
+      assert(isStream(foo$))
     })
 
     it('returns a writable store (enables $foo$ = 42 in svelte)', () => {
@@ -162,9 +162,9 @@ describe('connect', () => {
       const _foo$$ = sink$ => sink$
       const foo$ = connect(_foo$$)
       assert.ok(foo$)
-      assert(isFunction(foo$.subscribe), 'foo$ is a stream')
+      assert(isStream(foo$), 'foo$ is a stream')
       assert(isFunction(foo$.set), 'foo$ is a writable store')
-      disposables.push(foo$.subscribe(next))
+      disposable(foo$.subscribe(next))
       assert(next.notCalled)
       foo$.set(42)
       assert(next.calledOnceWith(42))
@@ -361,7 +361,7 @@ describe('connect', () => {
       const _foo$$ = sink$ => sink$.pipe(map(double))
       const foo$ = connect(_foo$$)
       const next = fake()
-      foo$.subscribe(next)
+      disposable(foo$.subscribe(next))
       assert(next.notCalled)
       foo$.set(42)
       assert(next.calledOnceWith(84))
@@ -374,11 +374,11 @@ describe('connect', () => {
       foo$.set(42)
       // first read
       const next = fake()
-      foo$.subscribe(next)
+      disposable(foo$.subscribe(next))
       assert(next.calledOnceWith(84))
       // second read
       const next2 = fake()
-      foo$.subscribe(next2)
+      disposable(foo$.subscribe(next2))
       assert(next.calledOnceWith(84))
     })
 
@@ -386,7 +386,7 @@ describe('connect', () => {
       const next = fake()
       const _foo$$ = sink$ => sink$.pipe(map(double))
       const foo$ = connect(_foo$$)
-      foo$.subscribe(next)
+      disposable(foo$.subscribe(next))
       assert(next.notCalled)
       // write
       foo$.set(42)
@@ -399,7 +399,7 @@ describe('connect', () => {
       const foo$ = connect(_foo$$)
       ;[1, 2, 3].forEach(x => foo$.set(x))
       assert(next.notCalled)
-      foo$.subscribe(next)
+      disposable(foo$.subscribe(next))
       assert.equal(next.callCount, 3)
       assert.deepEqual(next.args, [[2], [4], [6]])
     })
@@ -411,12 +411,12 @@ describe('connect', () => {
       // first reader (flush)
       const next = fake()
       assert(next.notCalled)
-      foo$.subscribe(next)
+      disposable(foo$.subscribe(next))
       assert.equal(next.callCount, 3)
       assert.deepEqual(next.args, [[2], [4], [6]])
       // second reader
       const next2 = fake()
-      foo$.subscribe(next2)
+      disposable(foo$.subscribe(next2))
       assert(next2.notCalled)
       foo$.set(42)
       assert.equal(next.callCount, 4)
@@ -432,7 +432,7 @@ describe('connect', () => {
         ;[1, 2, 3].forEach(x => foo$.set(x))
         const next = fake()
         assert(next.notCalled)
-        foo$.subscribe(next)
+        disposable(foo$.subscribe(next))
         assert.equal(next.callCount, 3)
         assert.deepEqual(next.args, [[2], [4], [6]])
       }
@@ -440,6 +440,39 @@ describe('connect', () => {
       {
         const next = fake()
         const foo$ = connect(_foo$$)
+        disposable(foo$.subscribe(next))
+        assert(next.notCalled)
+        foo$.set(42)
+        assert.equal(next.callCount, 1)
+        assert.equal(next.lastArg, 84)
+      }
+    })
+
+    // ----o-x---------> in createSink
+    // ------o--x------> connection 1
+    // -----------o----> connection 2
+    // o: subscribe, x: unsubscribe
+    it('remains functional after last subscriber unsubscribe', () => {
+      const _foo$$ = sink$ => sink$.pipe(map(double))
+      // first connectiton
+      {
+        const foo$ = connect(_foo$$)
+        ;[1, 2, 3].forEach(x => foo$.set(x))
+        const next = fake()
+        assert(next.notCalled)
+        const sub = foo$.subscribe(next)
+        assert.equal(next.callCount, 3)
+        assert.deepEqual(next.args, [[2], [4], [6]])
+        // unsubscribe
+        sub.unsubscribe()
+        foo$.set(4) // lost because hot
+        assert.equal(next.callCount, 3, 'does not receive after unsubscribe')
+      }
+      // second connection
+      {
+        const next = fake()
+        const foo$ = connect(_foo$$)
+        foo$.set(5) // lost
         foo$.subscribe(next)
         assert(next.notCalled)
         foo$.set(42)
