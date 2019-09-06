@@ -4,7 +4,7 @@ import assert from 'assert'
 import { fake } from 'sinon'
 
 import { createConnector } from '@/connect'
-import { isFunction, isStream } from '@/util/fp'
+import { isFunction, isReadWrite, isStream } from '@/util/fp'
 
 const double = x => 2 * x
 
@@ -107,7 +107,35 @@ describe('connect', () => {
     assert.equal(next.lastArg, 42)
   })
 
-  describe('with mixed source & sink', () => {
+  it('can resolves multiple providers from an object', () => {
+    const read = () => of(42)
+    const write = sink$ => {} // eslint-disable-line no-unused-vars
+    const readWrite = sink$ => sink$.pipe(map(double))
+    const { read: r, write: w, readWrite: rw } = connect({
+      read,
+      write,
+      readWrite,
+    })
+    assert(isStream(r))
+    assert(isFunction(w))
+    assert(isReadWrite(rw))
+  })
+
+  it('drops _ and $ in $$ from provider names when resolving multiple', () => {
+    const read$$ = () => of(42)
+    const _write = sink$ => {} // eslint-disable-line no-unused-vars
+    const _readWrite$$ = sink$ => sink$.pipe(map(double))
+    const { read$, write, readWrite$ } = connect({
+      read$$,
+      _write,
+      _readWrite$$,
+    })
+    assert(isStream(read$))
+    assert(isFunction(write))
+    assert(isReadWrite(readWrite$))
+  })
+
+  describe('with read/write providers', () => {
     it('returns the source$', () => {
       // eslint-disable-next-line no-unused-vars
       const _foo$$ = sink$ => of(42)
