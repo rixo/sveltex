@@ -107,29 +107,6 @@ describe('connect', () => {
     assert.equal(next.lastArg, 42)
   })
 
-  // const _foo = ({ sinkA$, sinkB$ }) => ...
-  it.skip('resolves sink objects', () => {
-    const nextA = fake()
-    const nextB = fake()
-    const _foo = o => {
-      o.a$.subscribe(nextA)
-      o.b$.subscribe(nextB)
-    }
-    const foo = connect(_foo)
-    const a$ = of(42)
-    const b$ = of(54)
-    assert.equal(nextA.callCount, 0)
-    assert.equal(nextB.callCount, 0)
-    foo({ a$, b$ })
-    assert.equal(nextA.callCount, 1)
-    assert.equal(nextA.lastArg, 42)
-    // assert.equal(nextB.callCount, 0)
-    // foo({ b$ })
-    assert.equal(nextA.callCount, 1)
-    assert.equal(nextA.callCount, 1)
-    assert.equal(nextA.lastArg, 54)
-  })
-
   describe('with mixed source & sink', () => {
     it('returns the source$', () => {
       // eslint-disable-next-line no-unused-vars
@@ -355,6 +332,32 @@ describe('connect', () => {
       assert(factory.notCalled)
       connect(_foo$$)
       assert(factory.calledOnce)
+    })
+
+    // can't see how to do that without Proxy
+    //
+    //     const _foo = ({ sinkA$, sinkB$ }) => ...
+    //
+    it.skip('can be an object of sinks', () => {
+      const nextA = fake()
+      const nextB = fake()
+      const _foo = o => {
+        o.a$.subscribe(nextA)
+        o.b$.subscribe(nextB)
+      }
+      const foo = connect(_foo)
+      const a$ = of(42)
+      const b$ = of(54)
+      assert.equal(nextA.callCount, 0)
+      assert.equal(nextB.callCount, 0)
+      foo({ a$, b$ })
+      assert.equal(nextA.callCount, 1)
+      assert.equal(nextA.lastArg, 42)
+      // assert.equal(nextB.callCount, 0)
+      // foo({ b$ })
+      assert.equal(nextA.callCount, 1)
+      assert.equal(nextA.callCount, 1)
+      assert.equal(nextA.lastArg, 54)
     })
 
     it('can be piped to source$', () => {
