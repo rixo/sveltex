@@ -1,0 +1,11 @@
+extends:
+  - '@rixo/svelte'
+
+overrides:
+  - files: ["**/*.spec.js"]
+    env:
+      mocha: true
+# settings:
+#   svelte3/enabled: true
+#   svelte3/ignore-warnings: false
+#   svelte3/lint-template: false
