@@ -1,3 +1,3 @@
 export { createConnector } from './lib/connect'
 
-export { Binder } from './lib/binder'
+export { binder } from './lib/binder'
