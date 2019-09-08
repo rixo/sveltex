@@ -1,61 +1,14 @@
 import { map, multicast } from 'rxjs/operators'
-import { EMPTY, NEVER, of, concat, ReplaySubject } from 'rxjs'
+import { EMPTY, of, ReplaySubject } from 'rxjs'
 import assert from 'assert'
 import { fake } from 'sinon'
 
 import { createConnector } from '@/connect'
 import { isFunction, isReadWrite, isStream } from '@/util/fp'
 
+import { FakeContext, FakeLifecycle, spyObservable } from './helpers'
+
 const double = x => 2 * x
-
-const FakeContext = () => {
-  let context = new Map()
-
-  const setContext = (key, value) => context.set(key, value)
-
-  const getContext = key => context.get(key)
-
-  const clear = () => {
-    context = new Map()
-  }
-
-  return { setContext, getContext, clear }
-}
-
-const FakeLifecycle = () => {
-  let destroyHandlers = []
-
-  const onDestroy = handler => {
-    destroyHandlers.push(handler)
-  }
-
-  const destroy = () => {
-    destroyHandlers.forEach(handler => handler())
-    destroyHandlers = []
-  }
-
-  return { onDestroy, destroy }
-}
-
-const spyObservable = (source$, end$ = NEVER) => {
-  const stream = concat(source$, end$)
-  const { subscribe: superSubscribe } = stream
-  const subscribe = fake(function(...args) {
-    const sub = superSubscribe.apply(this, args)
-    const { unsubscribe: superUnsubscribe } = sub
-    const unsubscribe = fake(function(...args) {
-      stream.unsubscribeCount++
-      return superUnsubscribe.apply(this, args)
-    })
-    stream.subscribeCount++
-    return Object.assign(sub, { unsubscribe })
-  })
-  return Object.assign(stream, {
-    subscribe,
-    subscribeCount: 0,
-    unsubscribeCount: 0,
-  })
-}
 
 describe('connect', () => {
   let context
