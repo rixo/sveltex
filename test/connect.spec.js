@@ -4,7 +4,7 @@ import assert from 'assert'
 import { fake } from 'sinon'
 
 import { createConnector } from '@/connect'
-import { isFunction, isReadWrite, isStream } from '@/util/fp'
+import { isFunction, isReadWrite, isStream } from '@/util'
 
 import { FakeContext, FakeLifecycle, spyObservable } from './helpers'
 
@@ -441,7 +441,7 @@ describe('connect', () => {
       // first connectiton
       {
         const foo$ = connect(_foo$$)
-        ;[1, 2, 3].forEach(x => foo$.set(x))
+        ;[1, 2, 3].forEach(x => foo$.set(of(x)))
         const next = fake()
         assert(next.notCalled)
         const sub = foo$.subscribe(next)
@@ -449,17 +449,17 @@ describe('connect', () => {
         assert.deepEqual(next.args, [[2], [4], [6]])
         // unsubscribe
         sub.unsubscribe()
-        foo$.set(4) // lost because hot
+        foo$.set(of(4)) // lost because hot
         assert.equal(next.callCount, 3, 'does not receive after unsubscribe')
       }
       // second connection
       {
         const next = fake()
         const foo$ = connect(_foo$$)
-        foo$.set(5) // lost
+        foo$.set(of(5)) // lost
         foo$.subscribe(next)
         assert(next.notCalled)
-        foo$.set(42)
+        foo$.set(of(42))
         assert.equal(next.callCount, 1)
         assert.equal(next.lastArg, 84)
       }
