@@ -75,13 +75,13 @@ describe('connect', () => {
   })
 
   it('drops _ and $ in $$ from provider names when resolving multiple', () => {
-    const read$$ = () => of(42)
+    const read$_ = () => of(42)
     const _write = sink$ => {} // eslint-disable-line no-unused-vars
-    const _readWrite$$ = sink$ => sink$.pipe(map(double))
+    const _readWrite$_ = sink$ => sink$.pipe(map(double))
     const { read$, write, readWrite$ } = connect({
-      read$$,
+      read$_,
       _write,
-      _readWrite$$,
+      _readWrite$_,
     })
     assert(isStream(read$))
     assert(isFunction(write))
