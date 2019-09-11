@@ -24,7 +24,7 @@
     "rxjs": "^6.5.3",
     "rxjs-compat": "^6.5.3",
     "sinon": "^7.4.2",
-    "svelte": "^3.12.0"
+    "svelte": "^3.12.1"
   },
   "dependencies": {
     "callbag-subject": "^1.0.2",

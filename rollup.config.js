@@ -1,7 +1,7 @@
 export default {
-  input: 'index.js',
+  input: 'lib/index.js',
   output: {
-    file: 'index.umd.js',
+    file: 'index.js',
     format: 'umd',
     name: 'sx',
   },
