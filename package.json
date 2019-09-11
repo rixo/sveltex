@@ -1,6 +1,6 @@
 {
   "name": "sveltex",
-  "version": "0.0.2-1",
+  "version": "0.0.2",
   "description": "RxJS utils for Svelte",
   "main": "index.js",
   "author": "rixo <rixo@rixo.fr>",
