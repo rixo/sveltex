@@ -394,6 +394,33 @@ builtin-status-codes@^3.0.0:
   resolved "https://registry.yarnpkg.com/builtin-status-codes/-/builtin-status-codes-3.0.0.tgz#85982878e21b98e1c66425e03d0174788f569ee8"
   integrity sha1-hZgoeOIbmOHGZCXgPQF0eI9Wnug=
 
+callbag-of@^2.0.0:
+  version "2.0.0"
+  resolved "https://registry.yarnpkg.com/callbag-of/-/callbag-of-2.0.0.tgz#645552ddba17d398124f4e31273af35d91d25823"
+  integrity sha512-eqOUTQn2P/gzlPlRKo/PY/bVRASDFiFNI2+kfjyd5YHJERET4u6WP4xHNmKJlWcDaFQtaJdigzryu+Ja+W6L9A==
+
+callbag-subject@^1.0.2:
+  version "1.0.2"
+  resolved "https://registry.yarnpkg.com/callbag-subject/-/callbag-subject-1.0.2.tgz#63923185000bcb10ec12d03491102aa43df93080"
+  integrity sha512-pMIKoXxJdO6SypymWQyLJHW/idY0esgT68I6xjYQjGZch0IVPlM5Bd+YSJaQ17fGLJEvK3HsaRaDuU8nmAqWOQ==
+
+callbag-subscribe@^1.5.1:
+  version "1.5.1"
+  resolved "https://registry.yarnpkg.com/callbag-subscribe/-/callbag-subscribe-1.5.1.tgz#1ecf12b1f041a6ae84bd071cbbaf8014eed2acc5"
+  integrity sha512-CRj2jKfcRvG8gap2ehsm/NxZVAjnwUApI+0ZY3bu6nyFfhhOzH+4RWpB/4RSJUZNN3ZILdSgAKQiUov/7ov9BQ==
+  dependencies:
+    callbag "^1.2.0"
+
+callbag-to-rxjs@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/callbag-to-rxjs/-/callbag-to-rxjs-1.0.0.tgz#32535260ae8310cbd9786d9c5e1d173b7d28925d"
+  integrity sha512-fHd6KGcl0Nmzlr6r0L0sYA+CookvfFtNNcGWLvv1ivhWlx3t/cQqO5VOzeOiPXnrQaGYBNXjCq0yi81BfELAcw==
+
+callbag@^1.2.0:
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/callbag/-/callbag-1.2.0.tgz#45e73962a466056c6e5f86f5627b35cf0c4df101"
+  integrity sha512-RMcVOk2oyA8CyCt/HsLEvnvvttKlaGVaG0uOo5IY7RpdiPLhStjxv5oYre33VJfT8kJE+cuKLSNHooz7yCUdhQ==
+
 callsites@^3.0.0:
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/callsites/-/callsites-3.1.0.tgz#b3630abd8943432f54b3f0519238e33cd7df2f73"
@@ -2035,6 +2062,11 @@ run-async@^2.2.0:
   dependencies:
     is-promise "^2.1.0"
 
+rxjs-compat@^6.5.3:
+  version "6.5.3"
+  resolved "https://registry.yarnpkg.com/rxjs-compat/-/rxjs-compat-6.5.3.tgz#18440949b2678bf87a78a754009676b2c49183dc"
+  integrity sha512-BIJX2yovz3TBpjJoAZyls2QYuU6ZiCaZ+U96SmxQpuSP/qDUfiXPKOVLbThBB2WZijNHkdTTJXKRwvv5Y48H7g==
+
 rxjs@^6.4.0, rxjs@^6.5.3:
   version "6.5.3"
   resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-6.5.3.tgz#510e26317f4db91a7eb1de77d9dd9ba0a4899a3a"
@@ -2289,6 +2321,11 @@ supports-color@^5.3.0, supports-color@^5.5.0:
   integrity sha512-QjVjwdXIt408MIiAqCX4oUKsgU2EqAGzs2Ppkm4aQYbjm+ZEWEcW4SfFNTr4uMNZma0ey4f5lgLrkB0aX0QMow==
   dependencies:
     has-flag "^3.0.0"
+
+svelte@^3.12.0:
+  version "3.12.0"
+  resolved "https://registry.yarnpkg.com/svelte/-/svelte-3.12.0.tgz#a30ec57c2d0e73638d6e8c28a3ac0f19f8ba1115"
+  integrity sha512-9/broj3bjShrsk3FuVDH0Bho2BchPKT8ubAqRcTqwkqrO9npOS3Vi98Yb5mBaa4bYV+ELTuvPvaQZbCJYMFRdg==
 
 table@^5.2.3:
   version "5.4.6"

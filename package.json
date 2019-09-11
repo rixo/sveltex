@@ -11,14 +11,21 @@
     "test:watch": "yarn test --watch"
   },
   "peerDependencies": {
-    "rxjs": "^6.5.3",
     "svelte": "^3.9.2"
   },
   "devDependencies": {
     "@rixo/eslint-config-svelte": "^0.7.0-alpha.8",
+    "callbag-of": "^2.0.0",
+    "callbag-to-rxjs": "^1.0.0",
     "esm": "^3.2.25",
     "mocha": "^6.2.0",
     "rxjs": "^6.5.3",
-    "sinon": "^7.4.2"
+    "rxjs-compat": "^6.5.3",
+    "sinon": "^7.4.2",
+    "svelte": "^3.12.0"
+  },
+  "dependencies": {
+    "callbag-subject": "^1.0.2",
+    "callbag-subscribe": "^1.5.1"
   }
 }
