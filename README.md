@@ -163,22 +163,20 @@ export const format_ = connectable(_formatConfig$_, config$ =>
   }
 </style>
 
-<h1>Dependency Injection</h1>
-
 <div class="db name">
   Database name: {@html formattedName}
 </div>
 
-<input use:input$ type="text" value="{dbName}" />
+<input use:input$ type="text" value={dbName} />
 
 <button use:button$>Rename</button>
 
 <div>
   <h2>Quotes</h2>
   {#each formatConfigs as config}
-  <button use:quoteButton$="{config}" class="quote button">
-    {config.left || config.char} {config.right || config.char}
-  </button>
+    <button use:quoteButton$={config} class="quote button">
+      {config.left || config.char} {config.right || config.char}
+    </button>
   {/each}
 </div>
 ```
