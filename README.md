@@ -2,7 +2,11 @@
 
 > A Svelte-first reactive model to complement Svelte's reactive views.
 
-Current status: experiment
+**Current status:** experiment :volcano:
+
+_(Did I fail to find the lab glass emoji, or does it just not exist in fact?)_
+
+At this point I'm eager for feedback, so feel free to open issues to share any thought.
 
 ## Example
 
