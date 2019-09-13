@@ -2,7 +2,7 @@ import assert from 'assert'
 
 import flattenName from '@/util/flattenName'
 
-describe('lib/fromContext.util', () => {
+describe('lib/util', () => {
   describe('flattenName', () => {
     it('is a function', () => {
       assert.equal(typeof flattenName, 'function')
