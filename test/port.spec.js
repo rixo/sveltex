@@ -24,22 +24,10 @@ describe('port', () => {
   // })
 
   describe('the _ property', () => {
-    it('can be used as an observable listener', () => {
-      assert.equal(typeof port._.next, 'function')
-      assert.equal(typeof port._.complete, 'function')
-      assert.equal(typeof port._.error, 'function')
-    })
-
-    it('has a next method', () => {
-      assert.equal(typeof port._.next, 'function')
-    })
-
-    it('has a error method', () => {
-      assert.equal(typeof port._.error, 'function')
-    })
-
-    it('has a complete method', () => {
-      assert.equal(typeof port._.complete, 'function')
+    it('is an observer', () => {
+      assert.equal(typeof port._.next, 'function', 'has a next method')
+      assert.equal(typeof port._.complete, 'function', 'has a complete method')
+      assert.equal(typeof port._.error, 'function', 'has an error method')
     })
 
     it('can be subscribed to a stream', () => {
