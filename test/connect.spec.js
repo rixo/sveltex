@@ -1,468 +1,122 @@
-import { map, multicast } from 'rxjs/operators'
-import { EMPTY, of, ReplaySubject } from 'rxjs'
 import assert from 'assert'
 import { fake } from 'sinon'
 
-import { createConnector } from '@/connect'
-import { isFunction, isReadWrite, isStream } from '@/util'
+import makeConnector from '@/connect'
+import { isFunction } from '@/util'
 
-import { FakeContext, FakeLifecycle, spyObservable } from './helpers'
-
-const double = x => 2 * x
+import { FakeContext } from './helpers'
 
 describe('connect', () => {
   let context
-  let lifecycle
   let connect
+  let resolve
+  let bootstrap
 
   beforeEach(() => {
     context = FakeContext()
-    lifecycle = FakeLifecycle()
-    connect = createConnector({ ...context, ...lifecycle })
-    // connect = connector.connect
-    // configure = connector.configure
+    const provider = makeConnector(context)
+    connect = provider.connect
+    bootstrap = provider.bootstrap
+    resolve = provider.resolve
   })
 
-  let disposables
-  const disposable = (...args) => disposables.push(...args)
-
-  beforeEach(() => {
-    disposables = []
-  })
-  afterEach(() => {
-    disposables.forEach(sub => sub.unsubscribe())
-  })
-
-  it('is a function', () => {
-    assert.equal(typeof connect, 'function')
-  })
-
-  it('resolves read-only providers to their source stream', () => {
-    const source$$ = () => of(42)
-    const source$ = connect(source$$)
-    const next = fake()
-    assert.equal(next.callCount, 0)
-    disposable(source$.subscribe(next))
-    assert.equal(next.callCount, 1)
-    assert.equal(next.lastArg, 42)
-  })
-
-  it('resolves write-only providers to their sink write function', () => {
-    const next = fake()
-    const _foo = sink$ => {
-      sink$.subscribe(next)
-    }
-    const foo = connect(_foo)
-    const value$ = of(42)
-    assert.equal(next.callCount, 0)
-    foo(value$)
-    assert.equal(next.callCount, 1)
-    assert.equal(next.lastArg, 42)
-  })
-
-  it('can resolves multiple providers from an object', () => {
-    const read = () => of(42)
-    const write = sink$ => {} // eslint-disable-line no-unused-vars
-    const readWrite = sink$ => sink$.pipe(map(double))
-    const { read: r, write: w, readWrite: rw } = connect({
-      read,
-      write,
-      readWrite,
-    })
-    assert(isStream(r))
-    assert(isFunction(w))
-    assert(isReadWrite(rw))
-  })
-
-  it('drops _ and $ in $$ from provider names when resolving multiple', () => {
-    const read$_ = () => of(42)
-    const _write = sink$ => {} // eslint-disable-line no-unused-vars
-    const _readWrite$_ = sink$ => sink$.pipe(map(double))
-    const { read$, write, readWrite$ } = connect({
-      read$_,
-      _write,
-      _readWrite$_,
-    })
-    assert(isStream(read$))
-    assert(isFunction(write))
-    assert(isReadWrite(readWrite$))
-  })
-
-  describe('with read/write providers', () => {
-    it('returns the source$', () => {
-      // eslint-disable-next-line no-unused-vars
-      const _foo$$ = sink$ => of(42)
-      const foo$ = connect(_foo$$)
-      assert.ok(foo$)
-      assert(isStream(foo$), 'foo$ is a stream')
+  describe('bootstrap', () => {
+    it('is a function', () => {
+      assert(isFunction(bootstrap))
     })
 
-    it('returns an object that can be destructured as [sink, source$]', () => {
-      // eslint-disable-next-line no-unused-vars
-      const _foo$$ = sink$ => of(33)
-      const [foo, foo$] = connect(_foo$$)
-      assert(isFunction(foo), 'foo is a function')
-      assert.ok(foo$)
-      assert(isStream(foo$), 'foo$ is a stream')
+    it('stores config in context', () => {
+      const config = { a: 1 }
+      const dispose = bootstrap(config)
+      const runtime = bootstrap.debugConfig()
+      assert.strictEqual(runtime.config, config)
+      if (dispose) dispose()
     })
 
-    it('returns an object that can be destructured as {_, $}', () => {
-      // eslint-disable-next-line no-unused-vars
-      const _foo$$ = sink$ => of(33)
-      const { _: foo, $: foo$ } = connect(_foo$$)
-      assert.equal(typeof foo, 'function')
-      assert.ok(foo$)
-      assert(isStream(foo$))
-    })
-
-    it('returns a writable store (enables $foo$ = 42 in svelte)', () => {
-      const next = fake()
-      const _foo$$ = sink$ => sink$
-      const foo$ = connect(_foo$$)
-      assert.ok(foo$)
-      assert(isStream(foo$), 'foo$ is a stream')
-      assert(isFunction(foo$.set), 'foo$ is a writable store')
-      disposable(foo$.subscribe(next))
-      assert(next.notCalled)
-      foo$.set(42)
-      assert(next.calledOnceWith(42))
-    })
-
-    it('resolves mixed source & sink', () => {
-      const nextIn = fake()
-      const nextOut = fake()
-      const _foo$$ = sink$ => {
-        sink$.pipe(map(double)).subscribe(nextIn)
-        return sink$.pipe(map(x => x * 3))
-      }
-      // const [foo, foo$] = connect(_foo$$)
-      const { _: foo, $: foo$ } = connect(_foo$$)
-      disposable(foo$.subscribe(nextOut))
-      assert(nextIn.notCalled)
-      assert(nextOut.notCalled)
-      foo(of(42))
-      assert(nextIn.calledOnceWith(84), 'value written to sink')
-      assert(nextOut.calledOnceWith(126), 'value output from source')
+    it('returns a dispose function', () => {
+      const dispose = bootstrap()
+      assert(isFunction(dispose))
     })
   })
 
-  describe("sink's write function", () => {
-    it('accepts streams', () => {
-      const next = fake()
-      const _foo = sink$ => {
-        sink$.subscribe(next)
-      }
-      const foo = connect(_foo)
-      foo(of('lifted'))
-      assert(next.calledOnceWith('lifted'))
-    })
-
-    it('accepts flat values', () => {
-      const next = fake()
-      const _foo = sink$ => {
-        sink$.subscribe(next)
-      }
-      const foo = connect(_foo)
-      foo('flat')
-      assert(next.calledOnceWith('flat'))
-    })
-
-    it('can be called multiple times on same connection', () => {
-      const next = fake()
-      const _foo = sink$ => {
-        sink$.subscribe(next)
-      }
-      const foo = connect(_foo)
-      assert(next.notCalled)
-      foo(of(42))
-      assert(next.calledOnceWith(42))
-      foo(of(54))
-      assert.equal(next.callCount, 2)
-      assert.equal(next.lastArg, 54)
-    })
-
-    it('can be called with multi value observable', () => {
-      const next = fake()
-      const _foo = sink$ => {
-        sink$.subscribe(next)
-      }
-      const foo = connect(_foo)
-      assert(next.notCalled)
-      foo(of(42, 54))
-      assert.equal(next.callCount, 2)
-      assert.equal(next.lastArg, 54)
-    })
-
-    it('unsubscribes from passed observables on destroy', () => {
-      const next = fake()
-      const value$ = spyObservable(of(20, 29))
-      const _foo = sink$ => {
-        sink$.subscribe(next)
-      }
-      const foo = connect(_foo)
-      assert.equal(value$.unsubscribeCount, 0)
-      foo(value$)
-      assert.equal(value$.unsubscribeCount, 0)
-      lifecycle.destroy()
-      assert.equal(value$.unsubscribeCount, 1)
-      lifecycle.destroy()
-      assert.equal(value$.unsubscribeCount, 1)
-    })
-  })
-
-  describe('source$', () => {
-    it('is unsubscribed when downstream is unsubscribed', () => {
-      const next = fake()
-      const value$ = spyObservable(of(1, 2, 3))
-      const foo$$ = () => value$
-      const foo$ = connect(foo$$)
-      assert(next.notCalled)
-      const sub = foo$.subscribe(next)
-      assert.equal(next.callCount, 3)
-      assert.equal(value$.unsubscribeCount, 0)
-      sub.unsubscribe()
-      assert.equal(value$.unsubscribeCount, 1)
-    })
-
-    describe('with ReplaySubject', () => {
-      it('is unsubscribed when downstream is unsubscribed', () => {
-        const next = fake()
-        const value$ = spyObservable(
-          of(42)
-            .pipe(multicast(() => new ReplaySubject(1)))
-            .refCount(),
-          EMPTY
-        )
-        const foo$$ = () => value$
-        const foo$ = connect(foo$$)
-        assert(next.notCalled)
-        const sub = foo$.subscribe(next)
-
-        assert.equal(next.callCount, 1)
-        assert.equal(value$.unsubscribeCount, 0)
-
-        sub.unsubscribe()
-
-        assert.equal(value$.unsubscribeCount, 1)
-      })
-
-      it('is resubscribed when downstream is resubscribed after dispose', () => {
-        const next = fake()
-        const value$ = spyObservable(of(42))
-        const foo$$ = () =>
-          value$.pipe(multicast(() => new ReplaySubject(1))).refCount()
-        const foo$ = connect(foo$$)
-        assert(next.notCalled)
-        const sub = foo$.subscribe(next)
-
-        assert.equal(next.callCount, 1)
-        assert.equal(value$.unsubscribeCount, 0, 'not unsubscribed')
-        assert.equal(value$.subscribeCount, 2)
-
-        sub.unsubscribe()
-
-        assert.equal(value$.unsubscribeCount, 2)
-        assert.equal(value$.subscribeCount, 2)
-
-        const sub2 = foo$.subscribe(next)
-        assert.equal(next.callCount, 2)
-        assert.equal(value$.unsubscribeCount, 2)
-        assert.equal(value$.subscribeCount, 4)
-
-        sub2.unsubscribe()
-        assert.equal(next.callCount, 2)
-        assert.equal(value$.unsubscribeCount, 4)
-        assert.equal(value$.subscribeCount, 4)
+  describe('connect', () => {
+    let wrapConnection
+    let disposeAll
+    beforeEach(() => {
+      wrapConnection = fake()
+      disposeAll = bootstrap({
+        wrapConnection,
       })
     })
-  })
+    afterEach(() => {
+      disposeAll()
+    })
 
-  describe('sink$', () => {
-    it('is passed as only argument to write-only services', () => {
-      const factory = fake() // can't use a fake as provider because of fn.length
-      function _foo(sink$) {
-        assert(isStream(sink$), 'sink$ is a stream')
-        assert.equal(arguments.length, 1)
-        factory()
+    it('is a function', () => {
+      assert(isFunction(connect))
+    })
+
+    it('resolves actual connect function from context', () => {
+      const runtime = bootstrap.debugConfig()
+      runtime.connect = fake()
+      connect('xxx')
+      assert(runtime.connect.calledOnceWith('xxx'))
+    })
+
+    it('lazily creates cyclotrons', () => {
+      const handler = fake()
+      assert.equal(handler.callCount, 0)
+      connect(handler)
+      assert.equal(handler.callCount, 1)
+    })
+
+    it('resolves already created cyclotrons from context, base on their handler identity', () => {
+      const handler = fake()
+      const cyclo = resolve(handler)
+      const resolved = resolve(handler)
+      assert.strictEqual(resolved, cyclo)
+    })
+
+    it('dispose all cyclotrons when bootstrap component is destroyed', () => {
+      const handlers = {
+        a: () => {},
+        b: sink$ => sink$,
+        c: () => {
+          connect(handlers.a)
+        },
       }
-      assert(factory.notCalled)
-      connect(_foo)
-      assert(factory.calledOnce)
-    })
-
-    it('is passed as only argument to read/write services', () => {
-      const factory = fake() // can't use a fake as provider because of fn.length
-      function _foo$$(sink$) {
-        assert(isStream(sink$), 'sink$ is a stream')
-        assert.equal(arguments.length, 1)
-        factory()
-        return of(1)
-      }
-      assert(factory.notCalled)
-      connect(_foo$$)
-      assert(factory.calledOnce)
-    })
-
-    it('is not passed to read-only services', () => {
-      const factory = fake() // can't use a fake as provider because of fn.length
-      function _foo$$() {
-        assert.equal(arguments.length, 0)
-        factory()
-        return of(1)
-      }
-      assert(factory.notCalled)
-      connect(_foo$$)
-      assert(factory.calledOnce)
-    })
-
-    // can't see how to do that without Proxy
-    //
-    //     const _foo = ({ sinkA$, sinkB$ }) => ...
-    //
-    it.skip('can be an object of sinks', () => {
-      const nextA = fake()
-      const nextB = fake()
-      const _foo = o => {
-        o.a$.subscribe(nextA)
-        o.b$.subscribe(nextB)
-      }
-      const foo = connect(_foo)
-      const a$ = of(42)
-      const b$ = of(54)
-      assert.equal(nextA.callCount, 0)
-      assert.equal(nextB.callCount, 0)
-      foo({ a$, b$ })
-      assert.equal(nextA.callCount, 1)
-      assert.equal(nextA.lastArg, 42)
-      // assert.equal(nextB.callCount, 0)
-      // foo({ b$ })
-      assert.equal(nextA.callCount, 1)
-      assert.equal(nextA.callCount, 1)
-      assert.equal(nextA.lastArg, 54)
-    })
-
-    it('can be piped to source$', () => {
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      const foo$ = connect(_foo$$)
-      const next = fake()
-      disposable(foo$.subscribe(next))
-      assert(next.notCalled)
-      foo$.set(42)
-      assert(next.calledOnceWith(84))
-    })
-
-    it('can be written before the first read', () => {
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      const foo$ = connect(_foo$$)
-      // write
-      foo$.set(42)
-      // first read
-      const next = fake()
-      disposable(foo$.subscribe(next))
-      assert(next.calledOnceWith(84))
-      // second read
-      const next2 = fake()
-      disposable(foo$.subscribe(next2))
-      assert(next.calledOnceWith(84))
-    })
-
-    it('does not emit before the first write', () => {
-      const next = fake()
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      const foo$ = connect(_foo$$)
-      disposable(foo$.subscribe(next))
-      assert(next.notCalled)
-      // write
-      foo$.set(42)
-      assert(next.calledOnceWith(84))
-    })
-
-    it('flushes all past values to first reader', () => {
-      const next = fake()
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      const foo$ = connect(_foo$$)
-      ;[1, 2, 3].forEach(x => foo$.set(x))
-      assert(next.notCalled)
-      disposable(foo$.subscribe(next))
-      assert.equal(next.callCount, 3)
-      assert.deepEqual(next.args, [[2], [4], [6]])
-    })
-
-    it('becomes hot when first reader subscribe', () => {
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      const foo$ = connect(_foo$$)
-      ;[1, 2, 3].forEach(x => foo$.set(x))
-      // first reader (flush)
-      const next = fake()
-      assert(next.notCalled)
-      disposable(foo$.subscribe(next))
-      assert.equal(next.callCount, 3)
-      assert.deepEqual(next.args, [[2], [4], [6]])
-      // second reader
-      const next2 = fake()
-      disposable(foo$.subscribe(next2))
-      assert(next2.notCalled)
-      foo$.set(42)
-      assert.equal(next.callCount, 4)
-      assert.equal(next.lastArg, 84)
-      assert(next2.calledOnceWith(84))
-    })
-
-    it('remains hot on subsequent connections', () => {
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      // first connectiton
+      // connect
+      connect(handlers.b)
+      connect(handlers.c)
+      // before dispose
+      const disposed = {}
       {
-        const foo$ = connect(_foo$$)
-        ;[1, 2, 3].forEach(x => foo$.set(x))
-        const next = fake()
-        assert(next.notCalled)
-        disposable(foo$.subscribe(next))
-        assert.equal(next.callCount, 3)
-        assert.deepEqual(next.args, [[2], [4], [6]])
+        const r = Object.entries(handlers).map(([k, handler]) => {
+          const cyclo = resolve(handler, true)
+          assert.ok(cyclo, `cyclo ${k} has been started`)
+          disposed[k] = fake()
+          cyclo.onDispose(disposed[k])
+          assert(disposed[k].notCalled, `cyclo ${k} has not been disposed`)
+        })
+        assert.equal(r.length, 3) // sanity check
       }
-      // second connection
+      // dispose
+      disposeAll()
+      // after
       {
-        const next = fake()
-        const foo$ = connect(_foo$$)
-        disposable(foo$.subscribe(next))
-        assert(next.notCalled)
-        foo$.set(42)
-        assert.equal(next.callCount, 1)
-        assert.equal(next.lastArg, 84)
+        const r = Object.entries(disposed).map(([k, disposed]) => {
+          assert(disposed.calledOnce, `cyclo ${k} has been disposed`)
+        })
+        assert.equal(r.length, 3) // sanity check
       }
     })
 
-    // ----o-x---------> in createSink
-    // ------o--x------> connection 1
-    // -----------o----> connection 2
-    // o: subscribe, x: unsubscribe
-    it('remains functional after last subscriber unsubscribe', () => {
-      const _foo$$ = sink$ => sink$.pipe(map(double))
-      // first connectiton
-      {
-        const foo$ = connect(_foo$$)
-        ;[1, 2, 3].forEach(x => foo$.set(of(x)))
-        const next = fake()
-        assert(next.notCalled)
-        const sub = foo$.subscribe(next)
-        assert.equal(next.callCount, 3)
-        assert.deepEqual(next.args, [[2], [4], [6]])
-        // unsubscribe
-        sub.unsubscribe()
-        foo$.set(of(4)) // lost because hot
-        assert.equal(next.callCount, 3, 'does not receive after unsubscribe')
-      }
-      // second connection
-      {
-        const next = fake()
-        const foo$ = connect(_foo$$)
-        foo$.set(of(5)) // lost
-        foo$.subscribe(next)
-        assert(next.notCalled)
-        foo$.set(of(42))
-        assert.equal(next.callCount, 1)
-        assert.equal(next.lastArg, 84)
-      }
+    it('wraps connections with wrapConnection', () => {
+      assert.equal(wrapConnection.callCount, 0)
+      connect(() => {})
+      assert.equal(wrapConnection.callCount, 1)
+      connect(() => {})
+      assert.equal(wrapConnection.callCount, 2)
     })
   })
 })
