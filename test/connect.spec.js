@@ -10,6 +10,9 @@ import { FakeContext, FakeLifecycle, spyObservable } from './helpers'
 
 const double = x => 2 * x
 
+const interopUnsubscribe = sub =>
+  typeof sub === 'function' ? sub() : sub.unsubscribe()
+
 describe('connect', () => {
   let context
   let lifecycle
@@ -30,7 +33,7 @@ describe('connect', () => {
     disposables = []
   })
   afterEach(() => {
-    disposables.forEach(sub => sub.unsubscribe())
+    disposables.forEach(interopUnsubscribe)
   })
 
   it('is a function', () => {
@@ -125,7 +128,8 @@ describe('connect', () => {
       disposable(foo$.subscribe(next))
       assert(next.notCalled)
       foo$.set(42)
-      assert(next.calledOnceWith(42))
+      assert.equal(next.callCount, 1)
+      assert.equal(next.lastArg, 42)
     })
 
     it('resolves mixed source & sink', () => {
