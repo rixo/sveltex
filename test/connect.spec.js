@@ -214,6 +214,29 @@ describe('connect', () => {
     })
   })
 
+  describe('source', () => {
+    it('can be any arbitrary object', () => {
+      const x = {}
+      const foo_ = () => x
+      const foo = connect(foo_)
+      assert.strictEqual(foo, x)
+    })
+
+    it('can be stream', () => {
+      const x = of(42)
+      const foo_ = () => x
+      const foo = connect(foo_)
+      assert.strictEqual(foo, x)
+    })
+
+    it('can be a function', () => {
+      const x = () => {}
+      const foo_ = () => x
+      const foo = connect(foo_)
+      assert.strictEqual(foo, x)
+    })
+  })
+
   describe('source$', () => {
     it('is unsubscribed when downstream is unsubscribed', () => {
       const next = fake()
