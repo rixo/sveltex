@@ -1,7 +1,5 @@
 import assert from 'assert'
 import { fake } from 'sinon'
-import toRx from 'callbag-to-rxjs'
-import of from 'callbag-of'
 
 import createPort from '@/port'
 
@@ -19,36 +17,23 @@ describe('port', () => {
     port = createPort()
   })
 
-  // it('is an object', () => {
-  //   assert.equal(typeof sink, 'object')
-  // })
+  it('is an object', () => {
+    assert.equal(typeof port, 'object')
+  })
 
   describe('the _ property', () => {
-    it('is an observer', () => {
+    it('is an observer object', () => {
       assert.equal(typeof port._.next, 'function', 'has a next method')
-      assert.equal(typeof port._.complete, 'function', 'has a complete method')
+      assert.equal(
+        typeof port._.complete,
+        'undefined',
+        'has no complete method'
+      )
       assert.equal(typeof port._.error, 'function', 'has an error method')
     })
 
-    it('can be subscribed to a stream', () => {
-      const next = fake()
-      port.$.subscribe(next)
-      assert(next.notCalled)
-      toRx(of(1, 2, 3)).subscribe(port._)
-      assert.equal(next.callCount, 3)
-    })
-
-    it('can be subscribed to multiple completing stream', () => {
-      const next = fake()
-      const complete = fake()
-      port.$.subscribe({ next, complete })
-      assert(next.notCalled)
-      toRx(of(1, 2, 3)).subscribe(port._)
-      assert.equal(next.callCount, 3)
-      assert.equal(complete.callCount, 1)
-      toRx(of(5, 6)).subscribe(port._)
-      assert.equal(next.callCount, 5)
-      assert.equal(complete.callCount, 2)
+    it('exposes a dispose function', () => {
+      assert.equal(typeof port._.dispose, 'function', 'has a dispose method')
     })
   })
 
@@ -100,7 +85,7 @@ describe('port', () => {
         port.$.subscribe(observer)
         port._.next(42)
         assert(complete.notCalled)
-        port._.complete()
+        port._.dispose()
         assert(complete.calledOnce)
       })
 

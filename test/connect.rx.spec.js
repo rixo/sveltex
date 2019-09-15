@@ -11,6 +11,7 @@ import {
 import {
   filter,
   map,
+  mergeAll,
   mergeMap,
   multicast,
   share,
@@ -18,6 +19,8 @@ import {
   switchMap,
   tap,
 } from 'rxjs/operators'
+import subscribe from 'callbag-subscribe'
+import toRx from 'callbag-to-rxjs'
 
 import makeConnector from '@/connect'
 import { isFunction, isStream } from '@/util'
@@ -190,7 +193,25 @@ const longRunning = config$ => new Observable(({ next, complete }) => {
 //   })
 // })
 
-describe.skip('connect with RxJS', () => {
+const wrapConnection = (_, $) => {
+  if (!$) {
+    if (!_) {
+      return Object.assign([_, $], { _, $ })
+    }
+    return wrapConnection(_, _)
+  }
+  return Object.assign($, {
+    _,
+    $,
+    // enables: `const [_, $] = connect(_foo$$)`
+    [Symbol.iterator]: () => [_, $][Symbol.iterator](),
+    // enables: `$foo$ = 42` in svelte
+    set: _ ? x => _(of(x)) : undefined,
+    // NOTE subscribe is already present since $ is an actual stream
+  })
+}
+
+describe('connect with RxJS', () => {
   let context
   let lifecycle
   let connect
@@ -202,7 +223,15 @@ describe.skip('connect with RxJS', () => {
     const connector = makeConnector({ ...context, ...lifecycle })
     connect = connector.connect
     bootstrap = connector.bootstrap
-    bootstrap({})
+    bootstrap({
+      readAdapter: toRx,
+      writeAdapter: _ => input$ => {
+        _.next(input$)
+        // const sub = input$.subscribe(_)
+        // return () => sub.unsubscribe()
+      },
+      wrapConnection,
+    })
   })
 
   let disposables
@@ -244,6 +273,7 @@ describe.skip('connect with RxJS', () => {
         const dispose = fake()
         const _foo$_ = sink$ =>
           sink$.pipe(
+            mergeAll(),
             switchMap(
               x =>
                 new Observable(obs => {
@@ -283,6 +313,7 @@ describe.skip('connect with RxJS', () => {
             const dispose = fake()
             const _foo$_ = sink$ =>
               sink$.pipe(
+                mergeAll(),
                 switchMap(
                   x =>
                     new Observable(obs => {
@@ -322,7 +353,11 @@ describe.skip('connect with RxJS', () => {
                   return dispose
                 })
             )
-            const _foo$_ = sink$ => sink$.pipe(switchMap(mapper))
+            const _foo$_ = sink$ =>
+              sink$.pipe(
+                mergeAll(),
+                switchMap(mapper)
+              )
             let next1, next2
             {
               const foo$ = connect(_foo$_)
@@ -347,6 +382,7 @@ describe.skip('connect with RxJS', () => {
             const dispose = fake()
             const _foo$_ = sink$ =>
               sink$.pipe(
+                mergeAll(),
                 switchMap(
                   x =>
                     new Observable(obs => {
@@ -387,6 +423,7 @@ describe.skip('connect with RxJS', () => {
             const dispose = fake()
             const _foo$_ = sink$ =>
               sink$.pipe(
+                mergeAll(),
                 switchMap(
                   x =>
                     new Observable(obs => {
@@ -437,6 +474,7 @@ describe.skip('connect with RxJS', () => {
           const complete = fake()
           const _foo$_ = sink$ =>
             sink$.pipe(
+              mergeAll(),
               switchMap(
                 x =>
                   new Observable(obs => {
@@ -490,6 +528,7 @@ describe.skip('connect with RxJS', () => {
           const complete = fake()
           const _foo$_ = sink$ =>
             sink$.pipe(
+              mergeAll(),
               switchMap(
                 x =>
                   new Observable(obs => {
@@ -500,6 +539,7 @@ describe.skip('connect with RxJS', () => {
               shareReplay(1),
               tap({ complete })
             )
+
           // subscriber 1
           {
             const foo$ = connect(_foo$_)
@@ -556,6 +596,7 @@ describe.skip('connect with RxJS', () => {
           )
           const _foo$_ = sink$ =>
             sink$.pipe(
+              mergeAll(),
               switchMap(producer),
               shareBehavior()
             )
@@ -624,6 +665,7 @@ describe.skip('connect with RxJS', () => {
           const dispose = fake()
           const _foo$_ = sink$ =>
             sink$.pipe(
+              mergeAll(),
               switchMap(
                 x =>
                   new Observable(obs => {
@@ -675,6 +717,7 @@ describe.skip('connect with RxJS', () => {
         const complete = fake()
         const _foo$_ = sink$ =>
           sink$.pipe(
+            mergeAll(),
             switchMap(
               x =>
                 new Observable(obs => {
