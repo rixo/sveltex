@@ -51,7 +51,7 @@ const makeFormat = ({ char, left = char, right = char }) => x =>
 
 // By keeping the config sink in a separated file, configuration code (that will
 // most likely be executed during app init) won't need to reference (import) the
-// actual implementation (format_) in this example. With code splitting, the
+// actual implementation (format_ in this example). With code splitting, the
 // brunt of the dependencies could be kept out of the initial chunk, to optimize
 // init time. With tree shaking, the config sink wouldn't even have to live in a
 // separated module (I guess, not too knowledgeable on tree shaking).
