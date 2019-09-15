@@ -76,10 +76,6 @@ describe('port', () => {
       })
     })
 
-    it('can be used as a stream source', () => {
-      assert.equal(typeof port.$.subscribe, 'function')
-    })
-
     it('accepts functions as observer', () => {
       const next = fake()
       port.$.subscribe(next)
