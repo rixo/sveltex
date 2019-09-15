@@ -7,6 +7,7 @@ import pipe from 'callbag-pipe'
 
 import makeCyclotron from '@/cyclotron'
 import { isFunction } from '@/util'
+import { noop } from '@/util/fp'
 
 import { FakeLifecycle } from './helpers'
 
@@ -20,7 +21,7 @@ const interopDispose = o => {
   }
 }
 
-describe.only('cyclotron', () => {
+describe('cyclotron', () => {
   let disposables
   beforeEach(() => {
     disposables = []
@@ -289,6 +290,56 @@ describe.only('cyclotron', () => {
       assert.equal(readAdapter.callCount, 1, 'called on first')
       Cyclo()
       assert.equal(readAdapter.callCount, 2, 'called on second')
+    })
+  })
+
+  describe('config: writeAdapter', () => {
+    const write = () => {}
+
+    let writeAdapter
+
+    beforeEach(() => {
+      writeAdapter = fake(() => write)
+      Cyclo = makeCyclo({
+        writeAdapter,
+      })
+    })
+
+    it('is not called before actually calling the write function', () => {
+      const cyclo = Cyclo()
+      cyclo.connect()
+      assert(writeAdapter.notCalled)
+    })
+
+    it('is called with the sink subject as argument', () => {
+      const cyclo = Cyclo()
+      const _ = cyclo.connect()._
+      _(42)
+      assert.equal(writeAdapter.lastArg, cyclo._)
+    })
+
+    it('is called when writing in passthrough', () => {
+      const cyclo = Cyclo()
+      const conn = cyclo.connect()
+      assert.equal(writeAdapter.callCount, 0)
+      conn._(42)
+      assert.equal(writeAdapter.callCount, 1)
+    })
+
+    it('is called when writing in write-only', () => {
+      const cyclo = Cyclo(sink$ => noop(sink$))
+      const conn = cyclo.connect()
+      assert.equal(writeAdapter.callCount, 0)
+      conn._(42)
+      assert.equal(writeAdapter.callCount, 1)
+    })
+
+    it('is called when writing in read / write', () => {
+      const cyclo = Cyclo(sink$ => sink$)
+      const conn = cyclo.connect()
+      assert.equal(writeAdapter.callCount, 0)
+      conn._(42)
+      assert.equal(writeAdapter.callCount, 1)
     })
   })
 
