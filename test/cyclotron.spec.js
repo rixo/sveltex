@@ -20,7 +20,7 @@ const interopDispose = o => {
   }
 }
 
-describe('cyclotron', () => {
+describe.only('cyclotron', () => {
   let disposables
   beforeEach(() => {
     disposables = []
@@ -33,19 +33,24 @@ describe('cyclotron', () => {
 
   let lifecycle
   let warn
+  let makeCyclo
   let Cyclo
   beforeEach(() => {
     lifecycle = FakeLifecycle()
     warn = fake()
-    const createCyclo = makeCyclotron({
+    const env = {
       onDestroy: lifecycle.onDestroy,
       warn,
-    })
-    Cyclo = (...args) => {
-      const cyclo = createCyclo(...args)
-      disposables.push(cyclo)
-      return cyclo
     }
+    makeCyclo = config => {
+      const Cyclo = makeCyclotron(env, config)
+      return (...args) => {
+        const cyclo = Cyclo(...args)
+        disposables.push(cyclo)
+        return cyclo
+      }
+    }
+    Cyclo = makeCyclo()
   })
 
   describe('the Cyclotron factory', () => {
@@ -244,6 +249,49 @@ describe('cyclotron', () => {
     it_is_a_cyclotron({ create, read: { expected: () => 42 }, write: true })
   })
 
+  describe('config: readAdapter', () => {
+    let readAdapter
+
+    beforeEach(() => {
+      readAdapter = fake(x => x)
+      Cyclo = makeCyclo({
+        readAdapter,
+      })
+    })
+
+    it('does not call readAdapter prematurely', () => {
+      assert.equal(readAdapter.callCount, 0)
+    })
+
+    it('wraps input sink$ on passthrough', () => {
+      Cyclo()
+      assert.equal(readAdapter.callCount, 1)
+    })
+
+    it('wraps input sink$ on write-only', () => {
+      // eslint-disable-next-line no-unused-vars
+      Cyclo(sink$ => {})
+      assert.equal(readAdapter.callCount, 1)
+    })
+
+    it('wraps input sink$ on read / write', () => {
+      Cyclo(sink$ => sink$)
+      assert.equal(readAdapter.callCount, 1)
+    })
+
+    it('does not wrap anything on read-only', () => {
+      Cyclo(() => 42)
+      assert.equal(readAdapter.callCount, 0)
+    })
+
+    it('is called on each new cyclotron', () => {
+      Cyclo(sink$ => sink$)
+      assert.equal(readAdapter.callCount, 1, 'called on first')
+      Cyclo()
+      assert.equal(readAdapter.callCount, 2, 'called on second')
+    })
+  })
+
   describe('the dispose function', () => {
     describe('on a passthrough cyclotron', () => {
       it('emits complete on the sink$', () => {
@@ -307,15 +355,9 @@ describe('cyclotron', () => {
 
     beforeEach(() => {
       unsubscribe = fake()
-      const Cyclo = makeCyclotron(
-        {
-          onDestroy: lifecycle.onDestroy,
-          warn,
-        },
-        {
-          writeAdapter: () => () => unsubscribe,
-        }
-      )
+      Cyclo = makeCyclo({
+        writeAdapter: () => () => unsubscribe,
+      })
       cyclo = Cyclo()
       conn = cyclo.connect()
     })
@@ -356,15 +398,9 @@ describe('cyclotron', () => {
         ba: fake(),
         ca: fake(),
       }
-      Cyclo = makeCyclotron(
-        {
-          onDestroy: lifecycle.onDestroy,
-          warn,
-        },
-        {
-          writeAdapter: () => key => unsubscribe[key],
-        }
-      )
+      Cyclo = makeCyclo({
+        writeAdapter: () => key => unsubscribe[key],
+      })
     })
 
     describe('when cyclo B connects to cyclo A', () => {
