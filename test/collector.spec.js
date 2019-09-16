@@ -1,61 +1,65 @@
 import assert from 'assert'
 import { fake } from 'sinon'
 
-import createPort from '@/port'
+import createCollector from '@/collector'
 
 const nextTo = ({ _ }) => x => _.next(x)
 
-describe('createPort', () => {
+describe('createCollector', () => {
   it('is a function', () => {
-    assert.equal(typeof createPort, 'function')
+    assert.equal(typeof createCollector, 'function')
   })
 })
 
-describe('port', () => {
-  let port
+describe('collector', () => {
+  let collector
   beforeEach(() => {
-    port = createPort()
+    collector = createCollector()
   })
 
   it('is an object', () => {
-    assert.equal(typeof port, 'object')
+    assert.equal(typeof collector, 'object')
   })
 
   describe('the _ property', () => {
     it('is an observer object', () => {
-      assert.equal(typeof port._.next, 'function', 'has a next method')
+      assert.equal(typeof collector._.next, 'function', 'has a next method')
       assert.equal(
-        typeof port._.complete,
+        typeof collector._.complete,
         'undefined',
         'has no complete method'
       )
-      assert.equal(typeof port._.error, 'function', 'has an error method')
+      assert.equal(typeof collector._.error, 'function', 'has an error method')
     })
 
     it('exposes a dispose function', () => {
-      assert.equal(typeof port._.dispose, 'function', 'has a dispose method')
+      assert.equal(
+        typeof collector._.dispose,
+        'function',
+        'has a dispose method'
+      )
     })
   })
 
   describe('the $ property', () => {
     it('has a subscribe function', () => {
-      assert.equal(typeof port.$.subscribe, 'function')
+      assert.equal(typeof collector.$.subscribe, 'function')
     })
 
     describe('the subscribe function', () => {
       it('returns a dispose function', () => {
-        const dispose = port.$.subscribe()
+        const dispose = collector.$.subscribe()
         assert.equal(typeof dispose, 'function')
       })
     })
 
     it('accepts functions as observer', () => {
       const next = fake()
-      port.$.subscribe(next)
+      collector.$.subscribe(next)
       assert(next.notCalled)
-      port._.next(42)
+      collector._.next(42)
       assert(next.calledOnceWith(42))
-      port._.error(new Error('oops'))
+      collector._.error(new Error('oops'))
       assert(next.calledOnceWith(42), 'not called on error')
     })
 
@@ -63,53 +67,53 @@ describe('port', () => {
       it('calls next on emissions', () => {
         const next = fake()
         const observer = { next }
-        port.$.subscribe(observer)
+        collector.$.subscribe(observer)
         assert(next.notCalled)
-        port._.next(42)
+        collector._.next(42)
         assert(next.calledOnceWith(42))
       })
 
       it('calls error on errors', () => {
         const error = fake()
         const observer = { error }
-        port.$.subscribe(observer)
-        port._.next(42)
+        collector.$.subscribe(observer)
+        collector._.next(42)
         const err = new Error('oops')
-        port._.error(err)
+        collector._.error(err)
         assert(error.calledOnceWith(err), 'calls error handler')
       })
 
       it('calls complete on completion', () => {
         const complete = fake()
         const observer = { complete }
-        port.$.subscribe(observer)
-        port._.next(42)
+        collector.$.subscribe(observer)
+        collector._.next(42)
         assert(complete.notCalled)
-        port._.dispose()
+        collector._.dispose()
         assert(complete.calledOnce)
       })
 
       it('returns a dispose function on subscribe', () => {
-        const sub = port.$.subscribe()
+        const sub = collector.$.subscribe()
         assert.equal(typeof sub, 'function')
       })
     })
 
     it('emits values to first observer', () => {
       const next = fake()
-      port.$.subscribe(next)
+      collector.$.subscribe(next)
       assert(next.notCalled)
-      port._.next(1)
+      collector._.next(1)
       assert(next.calledOnceWith(1))
     })
 
     it('emits values to second observer', () => {
       const next1 = fake()
       const next2 = fake()
-      port.$.subscribe(next1)
-      port.$.subscribe(next2)
+      collector.$.subscribe(next1)
+      collector.$.subscribe(next2)
       assert(next2.notCalled)
-      port._.next(1)
+      collector._.next(1)
       assert(next2.calledOnceWith(1))
     })
 
@@ -117,23 +121,23 @@ describe('port', () => {
       const next = fake()
       const values = [1, 2, 3]
       const expected = values.map(x => Array.of(x))
-      values.forEach(nextTo(port))
+      values.forEach(nextTo(collector))
       assert(next.notCalled)
-      port.$.subscribe(next)
+      collector.$.subscribe(next)
       assert.deepEqual(next.args, expected)
     })
 
     it('becomes hot after first observer', () => {
       const next = fake()
       const values = [1, 2, 3]
-      values.forEach(nextTo(port))
+      values.forEach(nextTo(collector))
       // first observer
-      port.$.subscribe(next)
+      collector.$.subscribe(next)
       // second
       const next2 = fake()
-      port.$.subscribe(next2)
+      collector.$.subscribe(next2)
       assert(next2.notCalled)
-      port._.next(42)
+      collector._.next(42)
       // assert(next.calledOnceWith(42))
       assert(next2.calledOnceWith(42))
     })
@@ -143,8 +147,8 @@ describe('port', () => {
   //   it('it is unsubscribed when the streams end', () => {
   //     const dispose = fake()
   //     const stream = toRx(of(5, 6)).pipe(map(x => x * 2))
-  //     const subscribe = spy(port, 'subscribe')
-  //     port.subscribe()
+  //     const subscribe = spy(collector, 'subscribe')
+  //     collector.subscribe()
   //     // assert(dispose.notCalled)
   //   })
   // })
