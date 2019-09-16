@@ -2,17 +2,33 @@ import { concat, NEVER } from 'rxjs'
 import { fake } from 'sinon'
 
 export const FakeContext = () => {
-  let context = new Map()
+  const elip = [new Map()] // reversed "pile"
 
-  const setContext = (key, value) => context.set(key, value)
+  const current = () => elip[0]
 
-  const getContext = key => context.get(key)
+  const setContext = (key, value) => current().set(key, value)
 
-  const clear = () => {
-    context = new Map()
+  const getContext = key => {
+    for (const context of elip) {
+      if (context.has(key)) {
+        return context.get(key)
+      }
+    }
   }
 
-  return { setContext, getContext, clear }
+  const clear = () => {
+    elip[0] = new Map()
+  }
+
+  const shadow = () => {
+    elip.unshift(new Map())
+  }
+
+  const pop = () => {
+    elip.shift()
+  }
+
+  return { setContext, getContext, clear, shadow, pop }
 }
 
 export const FakeLifecycle = () => {

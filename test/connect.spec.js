@@ -37,6 +37,82 @@ describe('connect', () => {
       const dispose = bootstrap()
       assert(isFunction(dispose))
     })
+
+    describe('contextual runtime resolution', () => {
+      let handler
+      let runtime0
+      let resolve0
+      let cyclo0
+
+      beforeEach(() => {
+        bootstrap()
+        handler = () => {}
+        runtime0 = bootstrap.debugConfig()
+        resolve0 = runtime0.resolve
+        cyclo0 = resolve0(handler)
+        const cyclo2 = resolve0(handler)
+        assert.strictEqual(cyclo0, cyclo2) // sanity check
+      })
+
+      const it_resolves_same_runtime = () => {
+        it('resolves the same runtime', () => {
+          const runtime = bootstrap.debugConfig()
+          assert.strictEqual(runtime, runtime0)
+        })
+      }
+
+      const it_resolves_same_cyclo = () => {
+        it('resolves to the same instance of an already resolved cyclo', () => {
+          const { resolve } = bootstrap.debugConfig()
+          const cyclo = resolve(handler)
+          assert.strictEqual(cyclo, cyclo0)
+        })
+      }
+
+      const it_resolves_another_disposed_cyclo = () => {
+        it('resolves to another instance of a disposed cyclo', () => {
+          const { resolve } = bootstrap.debugConfig()
+          cyclo0.dispose()
+          const cyclo = resolve(handler)
+          assert.notStrictEqual(cyclo, cyclo0)
+        })
+      }
+
+      describe('from the same context', () => {
+        it_resolves_same_runtime()
+        it_resolves_same_cyclo()
+        it_resolves_another_disposed_cyclo()
+      })
+
+      describe('from non bootstrapped child context', () => {
+        beforeEach(() => {
+          context.shadow()
+        })
+        it_resolves_same_runtime()
+        it_resolves_same_cyclo()
+        it_resolves_another_disposed_cyclo()
+      })
+
+      describe('from bootstrapped child context', () => {
+        beforeEach(() => {
+          context.shadow()
+          bootstrap()
+        })
+
+        it('resolves a new runtime', () => {
+          const runtime = bootstrap.debugConfig()
+          assert.notStrictEqual(runtime, runtime0)
+        })
+
+        it('resolves to another instance of an already resolved cyclo', () => {
+          const { resolve } = bootstrap.debugConfig()
+          const cyclo = resolve(handler)
+          assert.notStrictEqual(cyclo, cyclo0)
+        })
+
+        it_resolves_another_disposed_cyclo()
+      })
+    })
   })
 
   describe('connect', () => {
