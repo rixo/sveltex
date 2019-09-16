@@ -19,11 +19,10 @@ import {
   switchMap,
   tap,
 } from 'rxjs/operators'
-import subscribe from 'callbag-subscribe'
-import toRx from 'callbag-to-rxjs'
 
 import makeConnector from '@/connect'
 import { isFunction, isStream } from '@/util'
+import { readAdapter, writeAdapter, wrapConnection } from '@/rxjs'
 
 import { FakeContext, FakeLifecycle, spyObservable } from './helpers'
 
@@ -32,24 +31,6 @@ const shareBehavior = init => o =>
 
 const myShareReplay = n => o =>
   o.pipe(multicast(() => new ReplaySubject(n))).refCount()
-
-const wrapConnection = (_, $) => {
-  if (!$) {
-    if (!_) {
-      return Object.assign([_, $], { _, $ })
-    }
-    return wrapConnection(_, _)
-  }
-  return Object.assign($, {
-    _,
-    $,
-    // enables: `const [_, $] = connect(_foo$$)`
-    [Symbol.iterator]: () => [_, $][Symbol.iterator](),
-    // enables: `$foo$ = 42` in svelte
-    set: _ ? x => _(of(x)) : undefined,
-    // NOTE subscribe is already present since $ is an actual stream
-  })
-}
 
 describe('connect with RxJS', () => {
   let context
@@ -64,12 +45,8 @@ describe('connect with RxJS', () => {
     connect = connector.connect
     bootstrap = connector.bootstrap
     bootstrap({
-      readAdapter: toRx,
-      writeAdapter: _ => input$ => {
-        _.next(input$)
-        // const sub = input$.subscribe(_)
-        // return () => sub.unsubscribe()
-      },
+      readAdapter,
+      writeAdapter,
       wrapConnection,
     })
   })
