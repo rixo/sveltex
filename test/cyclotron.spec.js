@@ -372,7 +372,7 @@ describe('cyclotron', () => {
         const handler = sink$ =>
           pipe(
             sink$,
-            tap(null, null, complete)
+            tap(null, null, complete),
           )
         const cyclo = Cyclo(handler)
         disposable(subscribe()(cyclo.$))
@@ -386,7 +386,7 @@ describe('cyclotron', () => {
         const handler = sink$ =>
           pipe(
             sink$,
-            tap(null, null, complete)
+            tap(null, null, complete),
           )
         const cyclo = Cyclo(handler)
         disposable(subscribe()(cyclo.$))
