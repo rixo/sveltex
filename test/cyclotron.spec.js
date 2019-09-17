@@ -429,13 +429,97 @@ describe('cyclotron', () => {
     })
 
     describe('when the last consumer is disposed', () => {
-      it('does not dispose the cyclotron', () => {
+      it('disposes the cyclotron', () => {
         const disposed = fake()
         cyclo.onDispose(disposed)
         assert.equal(disposed.callCount, 0)
         conn._()
         lifecycle.destroy()
-        assert.equal(disposed.callCount, 0)
+        assert.equal(disposed.callCount, 1)
+      })
+    })
+  })
+
+  describe('lifecycle', () => {
+    it('disposes a cyclo when its number of connection falls from 1 to 0', () => {
+      const cyclo = Cyclo()
+      const disposed = fake()
+      cyclo.onDispose(disposed)
+      cyclo.connect()
+      assert(disposed.notCalled)
+      lifecycle.destroy()
+      assert(disposed.calledOnce)
+      lifecycle.destroy()
+      assert(disposed.calledOnce)
+    })
+
+    it('does not dispose a cyclo that connects to itself (daemon)', () => {
+      const handler = () => {
+        Cyclo(handler).connect()
+      }
+      const cyclo = Cyclo(handler)
+      const disposed = fake()
+      cyclo.onDispose(disposed)
+      cyclo.connect()
+      assert(disposed.notCalled, 'not disposed before consumer disposal')
+      lifecycle.destroy()
+      assert(disposed.notCalled, 'not disposed after consumer disposal')
+      lifecycle.destroy()
+      assert(disposed.notCalled, 'not disposed after extraneous disposal')
+    })
+
+    it('can dispose a daemon cyclo when its inner cyclo (ouroboros) is disposed', () => {
+      let ouroboros
+      const handler = () => {
+        assert(!ouroboros)
+        ouroboros = Cyclo(handler)
+        ouroboros.connect()
+      }
+      const cyclo = Cyclo(handler)
+      const disposed = fake()
+      cyclo.onDispose(disposed)
+      cyclo.connect()
+      assert(disposed.notCalled, 'not disposed before ouroboros disposal')
+      ouroboros.dispose()
+      assert(disposed.notCalled, 'not disposed after ouroboros disposal')
+      ouroboros.dispose()
+      ouroboros.dispose()
+      assert(disposed.notCalled, 'not disposed after ouroboros extra disposals')
+      cyclo._disconnect()
+      assert(disposed.calledOnce, 'disposed after last disconnect')
+    })
+
+    describe('an ourobros', () => {
+      let ouroboros
+      let cyclo
+      beforeEach(() => {
+        ouroboros = null
+        const handler = () => {
+          assert(!ouroboros)
+          ouroboros = Cyclo(handler)
+          ouroboros.connect()
+        }
+        cyclo = Cyclo(handler)
+      })
+
+      it('is created when a cyclo connects to itself', () => {
+        assert.ok(ouroboros)
+      })
+
+      it('is a function', () => {
+        assert(isFunction(ouroboros))
+      })
+
+      it('can be called as a function to dispose itself', () => {
+        const disposed = fake()
+        cyclo.onDispose(disposed)
+        // sanity check
+        cyclo.connect()
+        cyclo._disconnect()
+        assert(disposed.notCalled, 'not disposed before ouroboros disposal')
+        // call
+        ouroboros()
+        assert(disposed.calledOnce, 'disposed after ouroboros disposal')
       })
     })
   })

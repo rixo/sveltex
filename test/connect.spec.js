@@ -4,17 +4,19 @@ import { fake } from 'sinon'
 import makeConnector from '@/connect'
 import { isFunction } from '@/util'
 
-import { FakeContext } from './helpers'
+import { FakeContext, FakeLifecycle } from './helpers'
 
 describe('connect', () => {
   let context
+  let lifecycle
   let connect
   let resolve
   let bootstrap
 
   beforeEach(() => {
     context = FakeContext()
-    const provider = makeConnector(context)
+    lifecycle = FakeLifecycle()
+    const provider = makeConnector({ ...context, ...lifecycle })
     connect = provider.connect
     bootstrap = provider.bootstrap
     resolve = provider.resolve
@@ -153,7 +155,15 @@ describe('connect', () => {
       assert.strictEqual(resolved, cyclo)
     })
 
-    it('dispose all cyclotrons when bootstrap component is destroyed', () => {
+    it('wraps connections with wrapConnection', () => {
+      assert.equal(wrapConnection.callCount, 0)
+      connect(() => {})
+      assert.equal(wrapConnection.callCount, 1)
+      connect(() => {})
+      assert.equal(wrapConnection.callCount, 2)
+    })
+
+    it('disposes all cyclotrons when bootstrap component is destroyed', () => {
       const handlers = {
         a: () => {},
         b: sink$ => sink$,
@@ -187,12 +197,36 @@ describe('connect', () => {
       }
     })
 
-    it('wraps connections with wrapConnection', () => {
-      assert.equal(wrapConnection.callCount, 0)
-      connect(() => {})
-      assert.equal(wrapConnection.callCount, 1)
-      connect(() => {})
-      assert.equal(wrapConnection.callCount, 2)
+    it('disposes a cyclotron when its number of connections falls from 1 to 0', () => {
+      const handler = () => {}
+      connect(handler)
+      const cyclo = resolve(handler)
+      const disposed = fake()
+      cyclo.onDispose(disposed)
+      assert(disposed.notCalled)
+      lifecycle.destroy()
+      assert(disposed.calledOnce)
+    })
+
+    it('does not dispose a cyclotron that connects to itself (daemon)', () => {
+      const handler = () => {
+        connect(handler)
+      }
+      connect(handler)
+      const cyclo = resolve(handler)
+      const disposed = fake()
+      cyclo.onDispose(disposed)
+      // before onDestroy
+      assert(disposed.notCalled)
+      assert.equal(cyclo._refCount, 2)
+      // after onDestroy
+      lifecycle.destroy()
+      assert(disposed.notCalled)
+      assert.equal(cyclo._refCount, 1)
+      // after extraneous onDestroy
+      lifecycle.destroy()
+      assert(disposed.notCalled)
+      assert.equal(cyclo._refCount, 1)
     })
   })
 })

@@ -1,1 +1,1 @@
-export { bootstrap } from './lib/rxjs'
+export { bootstrap } from './lib/rxjs/bootstrap'
