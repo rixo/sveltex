@@ -1,12 +1,15 @@
 import assert from 'assert'
 import { fake } from 'sinon'
 import {
-  of,
-  from,
-  Observable,
   BehaviorSubject,
-  Subject,
+  defer,
+  from,
+  merge,
+  NEVER,
+  Observable,
+  of,
   ReplaySubject,
+  Subject,
 } from 'rxjs'
 import {
   filter,
@@ -14,6 +17,9 @@ import {
   mergeAll,
   mergeMap,
   multicast,
+  publish,
+  publishReplay,
+  publishBehavior,
   share,
   shareReplay,
   switchMap,
@@ -22,7 +28,7 @@ import {
 
 import makeConnector from '@/connect'
 import { isFunction, isStream } from '@/util'
-import { readAdapter, writeAdapter, wrapConnection } from '@/rxjs'
+import { readAdapter, writeAdapter, wrapConnection } from '@/rxjs/bootstrap'
 
 import { FakeContext, FakeLifecycle, spyObservable } from './helpers'
 
@@ -36,6 +42,7 @@ describe('connect with RxJS', () => {
   let context
   let lifecycle
   let connect
+  let resolve
   let bootstrap
 
   beforeEach(() => {
@@ -43,6 +50,7 @@ describe('connect with RxJS', () => {
     lifecycle = FakeLifecycle()
     const connector = makeConnector({ ...context, ...lifecycle })
     connect = connector.connect
+    resolve = connector.resolve
     bootstrap = connector.bootstrap
     bootstrap({
       readAdapter,
@@ -65,6 +73,22 @@ describe('connect with RxJS', () => {
     assert(isFunction(connect))
   })
 
+  it('disposes a single input streams when the consumer is destroyed', () => {
+    const _foo_ = sink$ => sink$.pipe(mergeAll())
+    const foo = connect(_foo_)
+    const unsubscribe = fake()
+    const subscribe = fake(() => ({ unsubscribe }))
+    const input$ = Object.assign(of(42), { subscribe })
+    foo._(input$)
+    assert.equal(subscribe.callCount, 0, 'subscribe not called prematurely')
+    foo.subscribe()
+    assert.equal(subscribe.callCount, 1, 'subscribe has been called')
+    assert.equal(unsubscribe.callCount, 0, 'unsubscribe not called prematurely')
+    lifecycle.destroy()
+    assert.equal(subscribe.callCount, 1, 'subscribe not called extraneously')
+    assert.equal(unsubscribe.callCount, 1, 'unsubscribe has been called')
+  })
+
   describe('when sink emits complete', () => {
     // DEBUG what??
   })
@@ -75,14 +99,14 @@ describe('connect with RxJS', () => {
     it('')
   })
 
-  describe('read-only services', () => {
-    it('returns a driver', () => {
-      const service = { id: 'service' }
-      const foo_ = () => service
-      const foo = connect(foo_)
-      assert.strictEqual(foo, service)
-    })
-  })
+  // describe('read-only services', () => {
+  //   it('returns a driver', () => {
+  //     const service = { id: 'service' }
+  //     const foo_ = () => service
+  //     const foo = connect(foo_)
+  //     assert.strictEqual(foo, service)
+  //   })
+  // })
 
   describe('patterns', () => {
     describe('long lived service', () => {
@@ -96,9 +120,9 @@ describe('connect with RxJS', () => {
                 new Observable(obs => {
                   obs.next(x * 2)
                   return dispose
-                })
+                }),
             ),
-            shareReplay(1)
+            shareReplay(1),
           )
         {
           const foo$ = connect(_foo$_)
@@ -136,8 +160,8 @@ describe('connect with RxJS', () => {
                     new Observable(obs => {
                       obs.next(x * 2)
                       return dispose
-                    })
-                )
+                    }),
+                ),
               )
             {
               const foo$ = connect(_foo$_)
@@ -168,12 +192,12 @@ describe('connect with RxJS', () => {
                 new Observable(obs => {
                   obs.next(x * 2)
                   return dispose
-                })
+                }),
             )
             const _foo$_ = sink$ =>
               sink$.pipe(
                 mergeAll(),
-                switchMap(mapper)
+                switchMap(mapper),
               )
             let next1, next2
             {
@@ -205,8 +229,8 @@ describe('connect with RxJS', () => {
                     new Observable(obs => {
                       obs.next(x * 2)
                       return dispose
-                    })
-                )
+                    }),
+                ),
               )
             let sub1, sub2, next1, next2
             {
@@ -218,7 +242,7 @@ describe('connect with RxJS', () => {
               assert.equal(
                 dispose.callCount,
                 2,
-                'intermediate observables have been disposed'
+                'intermediate observables have been disposed',
               )
             }
             {
@@ -230,7 +254,7 @@ describe('connect with RxJS', () => {
               assert.equal(
                 dispose.callCount,
                 7,
-                'intermediate observables have been disposed'
+                'intermediate observables have been disposed',
               )
             }
           })
@@ -246,8 +270,8 @@ describe('connect with RxJS', () => {
                     new Observable(obs => {
                       obs.next(x * 2)
                       return dispose
-                    })
-                )
+                    }),
+                ),
               )
             let sub1, sub2, next1, next2
             {
@@ -266,20 +290,20 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               7,
-              'intermediate observables have been disposed'
+              'intermediate observables have been disposed',
             )
             // dispose
             sub1.unsubscribe()
             assert.equal(
               dispose.callCount,
               3 + 3 + 2,
-              'last observable of subscription 1 has been disposed'
+              'last observable of subscription 1 has been disposed',
             )
             sub2.unsubscribe()
             assert.equal(
               dispose.callCount,
               3 + 3 + 3,
-              'last observable of subscription 2 has been disposed'
+              'last observable of subscription 2 has been disposed',
             )
           })
         })
@@ -297,10 +321,10 @@ describe('connect with RxJS', () => {
                   new Observable(obs => {
                     obs.next(x * 2)
                     return dispose
-                  })
+                  }),
               ),
               myShareReplay(1),
-              tap({ complete })
+              tap({ complete }),
             )
           // subscriber 1
           {
@@ -311,13 +335,13 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               2,
-              'intermediate observables are diposed'
+              'intermediate observables are diposed',
             )
             sub.unsubscribe()
             assert.equal(
               dispose.callCount,
               3,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
           }
           // subscriber 2
@@ -329,13 +353,13 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               5,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
             sub.unsubscribe()
             assert.equal(
               dispose.callCount,
               6,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
           }
         })
@@ -351,10 +375,10 @@ describe('connect with RxJS', () => {
                   new Observable(obs => {
                     obs.next(x * 2)
                     return dispose
-                  })
+                  }),
               ),
               shareReplay(1),
-              tap({ complete })
+              tap({ complete }),
             )
 
           // subscriber 1
@@ -366,18 +390,18 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               2,
-              'intermediate observables are diposed'
+              'intermediate observables are diposed',
             )
             assert.equal(
               dispose.callCount,
               2,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
             sub.unsubscribe()
             assert.equal(
               dispose.callCount,
               2,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
           }
           // subscriber 2
@@ -389,13 +413,13 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               5,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
             sub.unsubscribe()
             assert.equal(
               dispose.callCount,
               5,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
           }
         })
@@ -409,13 +433,13 @@ describe('connect with RxJS', () => {
               new Observable(obs => {
                 obs.next(x * 2)
                 return dispose
-              })
+              }),
           )
           const _foo$_ = sink$ =>
             sink$.pipe(
               mergeAll(),
               switchMap(producer),
-              shareBehavior()
+              shareBehavior(),
             )
           // subscriber 1
           {
@@ -448,9 +472,9 @@ describe('connect with RxJS', () => {
                   new Observable(obs => {
                     obs.next(x * 2)
                     // return dispose
-                  })
+                  }),
               ),
-              shareBehavior()
+              shareBehavior(),
             )
           // subscriber 1
           {
@@ -488,9 +512,9 @@ describe('connect with RxJS', () => {
                   new Observable(obs => {
                     obs.next(x * 2)
                     return dispose
-                  })
+                  }),
               ),
-              shareBehavior()
+              shareBehavior(),
             )
           // subscriber 1
           {
@@ -501,7 +525,7 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               2,
-              'last observable is not disposed'
+              'last observable is not disposed',
             )
             sub.unsubscribe()
             assert.equal(dispose.callCount, 3, 'last observable is disposed')
@@ -515,13 +539,13 @@ describe('connect with RxJS', () => {
             assert.equal(
               dispose.callCount,
               5,
-              'current observable and new intermediate observables have been diposed'
+              'current observable and new intermediate observables have been diposed',
             )
             sub.unsubscribe()
             assert.equal(
               dispose.callCount,
               6,
-              'last observable has been disposed'
+              'last observable has been disposed',
             )
           }
         })
@@ -540,10 +564,10 @@ describe('connect with RxJS', () => {
                 new Observable(obs => {
                   obs.next(x * 2)
                   return dispose
-                })
+                }),
             ),
             tap(complete),
-            shareReplay(1)
+            shareReplay(1),
           )
         // subscriber 1
         {
@@ -575,6 +599,87 @@ describe('connect with RxJS', () => {
           // assert.equal(dispose.callCount, 6)
         }
       })
+    })
+
+    const it_can_define_daemon = (
+      desc,
+      operator,
+      nBefore = 0,
+      nAfter = 3,
+      firstValue,
+    ) =>
+      it(`can define a daemon cyclo with ${desc}`, () => {
+        const next = fake()
+        const _foo_ = sink$ =>
+          sink$.pipe(
+            mergeAll(),
+            // it works with shareReplay, but not any other variant, even the
+            // conceptual equivalence with multicast, so it seems more than a bug
+            // in RxJS than reliable behavior:
+            //
+            //     shareReplay(1), // OK
+            //     multicast(() => new ReplaySubject(1)) // .refCount() KO
+            //     share(), // KO
+            //
+            // ... better to use a well understood specialisation
+            //
+            operator,
+          )
+        // tracker
+        const disposed = fake()
+        resolve(_foo_).onDispose(disposed)
+        // subscription
+        const sub = connect(_foo_).subscribe(next)
+        assert.equal(disposed.callCount, 0)
+        // sanity check
+        assert.equal(next.callCount, nBefore, 'no premature emissions')
+        if (nBefore > 0) {
+          assert.equal(next.lastArg, firstValue)
+        }
+        connect(_foo_)._(of(1, 2, 3))
+        assert.equal(next.callCount, nAfter, 'emissions are propagated')
+        // unsubscription
+        sub.unsubscribe()
+        assert.equal(disposed.callCount, 0, 'has not been disposed')
+      })
+
+    describe.skip('daemon', () => {
+      // it_can_define_daemon('daemon()', daemon())
+      // it_can_define_daemon('daemonReplay(1)', daemonReplay(1))
+      // it_can_define_daemon('daemonBehavior()', daemonBehavior(42), 1, 4, 42)
+    })
+
+    it.skip('auto dispose service', () => {
+      const _foo_ = sink$ => sink$.pipe(mergeAll())
+      // tracker
+      const disposed = fake()
+      resolve(_foo_).onDispose(disposed)
+      // subscription
+      const sub = connect(_foo_).subscribe()
+      assert.equal(disposed.callCount, 0)
+      // unsubscription
+      sub.unsubscribe()
+      assert.equal(disposed.callCount, 1)
+    })
+
+    it.skip('auto dispose read-only', () => {
+      const _foo = () =>
+        defer(function*() {
+          for (let i = 0; i < 5; i++) {
+            yield i
+          }
+        })
+      // tracker
+      const disposed = fake()
+      resolve(_foo).onDispose(disposed)
+      // subscription
+      const next = fake()
+      const sub = connect(_foo).subscribe(next)
+      assert.equal(next.callCount, 5)
+      assert.equal(disposed.callCount, 0)
+      // unsubscription
+      sub.unsubscribe()
+      assert.equal(disposed.callCount, 0)
     })
   })
 })
