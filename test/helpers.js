@@ -33,32 +33,37 @@ export const FakeContext = () => {
 
 export const FakeLifecycle = () => {
   const destroyHandlers = {}
-  let current = null
 
-  const setCurrent = x => {
-    current = x
-  }
-
-  const getHandlers = () => {
-    const handlers = destroyHandlers[current]
+  const getHandlers = key => {
+    const handlers = destroyHandlers[key]
     if (!handlers) {
       const handlers = []
-      destroyHandlers[current] = handlers
-      return destroyHandlers[current]
+      destroyHandlers[key] = handlers
+      return destroyHandlers[key]
     }
     return handlers
   }
 
-  const onDestroy = handler => {
-    getHandlers().push(handler)
+  const onDestroy = (handler, key = me.current) => {
+    getHandlers(key).push(handler)
   }
 
-  const destroy = () => {
-    getHandlers().forEach(handler => handler())
-    destroyHandlers[current] = []
+  const destroy = (key = me.current) => {
+    getHandlers(key).forEach(handler => handler())
+    destroyHandlers[key] = []
   }
 
-  return { onDestroy, destroy, setCurrent }
+  const _in = (key, fn) => {
+    const previous = me.current
+    me.current = key
+    fn()
+    me.current = previous
+    return me
+  }
+
+  const me = { onDestroy, destroy, in: _in, current: null }
+
+  return me
 }
 
 export const spyObservable = (source$, end$ = NEVER) => {
