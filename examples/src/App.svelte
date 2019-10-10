@@ -12,7 +12,11 @@
     },
   ]
 
-  const goto = async link => {}
+  let app = apps.filter(({ default: dft }) => dft)[0] || apps[0]
+
+  const goto = async toApp => {
+    app = toApp
+  }
 </script>
 
 <AppLayout>
@@ -24,6 +28,6 @@
     {/each}
   </ul>
 
-  <AppDi />
+  <svelte:component this={app.App} />
 
 </AppLayout>

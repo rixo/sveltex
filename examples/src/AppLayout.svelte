@@ -45,6 +45,10 @@
   menu :global(li) {
     list-style: none;
     font-weight: 120%;
+    margin: 0.66em 0;
+  }
+  menu :global(li a) {
+    display: block;
   }
 </style>
 
