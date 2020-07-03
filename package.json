@@ -1,13 +1,12 @@
 {
   "name": "sveltex",
   "version": "0.0.7",
-  "description": "Minimalistic IOC & supercharged stores for Svelte",
-  "main": "index.js",
+  "description": "Minimalistic DI & async friendly stores for Svelte",
   "author": "rixo <rixo@rixo.fr>",
   "license": "MIT",
-  "scripts": {
-    "test": "echo TODO"
-  },
+  "main": "index.js",
+  "browser": "index.js",
+  "files": ["index.js", "src"],
   "peerDependencies": {
     "svelte": "^3.9.2"
   },
@@ -17,5 +16,8 @@
     "zoar": "^0.0.4",
     "zorax": "^0.0.8"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "scripts": {
+    "test": "zoar"
+  }
 }
