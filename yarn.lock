@@ -2538,10 +2538,10 @@ zora@^3.0.0, zora@^3.1.8:
   resolved "https://registry.yarnpkg.com/zora/-/zora-3.1.9.tgz#75024fab405709317babb26cdefd421b5733ca29"
   integrity sha512-6jd7VEVTVAJFESLW9WMfomKLbOPy2SOcV+LrKn87VgpUfdoUiIxOJgu8pYvWzk85qbglnfzh/TDRjsbknurN6A==
 
-zorax@^0.0.8:
-  version "0.0.8"
-  resolved "https://registry.yarnpkg.com/zorax/-/zorax-0.0.8.tgz#ad952f2377dde8f34fb01d8e80660c37f018d2ef"
-  integrity sha512-sJiz4U2IuIQk5+KaNa3hpU5yOIKODVnUMAbddu3scArgsGan4l0teM3+7MUlDqDDuLWRLRt0AoinTehkXYe6Tg==
+zorax@^0.0.10:
+  version "0.0.10"
+  resolved "https://registry.yarnpkg.com/zorax/-/zorax-0.0.10.tgz#6d8ca6fc8bbcc094d772ef19fe21386a7fb6c382"
+  integrity sha512-kC4mn67ue9gi9jXzWio9geXnUePApst9A/G7Jqsk6VoWhbKGVQ3KqbdVyLkQHKX5tNdQMxocw1aHBCMOG2KAow==
   dependencies:
     "@zorax/plug" "^0.0.1"
     zora "^3.0.0"

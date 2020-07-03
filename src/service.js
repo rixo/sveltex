@@ -1,6 +1,8 @@
 const KEY = { context_key: 'sveltex' }
 
 export const createServiceFactory = ({ setContext, getContext }) => {
+  let nextId = 0
+
   const service = (name, provider) => {
     // service(name: string, provider: function)
     // service(provider: function)
@@ -10,24 +12,15 @@ export const createServiceFactory = ({ setContext, getContext }) => {
     }
 
     const subscribe = subscriber => {
-      const resolve = getContext(KEY)
+      const container = getContext(KEY)
 
-      if (!resolve) {
+      if (!container) {
         throw new Error(
           'Tried to resolve service outside of a Sveltex container',
         )
       }
 
-      const entry = resolve(handle, provider)
-      const { store } = entry
-
-      entry.resolving(true)
-
-      const result = store.subscribe(subscriber)
-
-      entry.resolving(false)
-
-      return result
+      return container.subscribe(handle, provider, subscriber)
     }
 
     const handle = { name, subscribe }
@@ -36,24 +29,49 @@ export const createServiceFactory = ({ setContext, getContext }) => {
   }
 
   const sveltex = override => {
-    const parentResolve = getContext(KEY)
+    const parent = getContext(KEY)
     const registry = new WeakMap()
-    const resolving = new Set()
     const overrides = override && new WeakMap(override)
 
-    const hasOverride = handle => overrides && overrides.has(handle)
+    const resolving = (parent && parent.resolving) || new Set()
 
-    const get = handle => {
+    const get = handle => registry.get(handle) || (parent && parent.get(handle))
+
+    const getProvider = handle =>
+      (overrides && overrides.get(handle)) ||
+      (parent && parent.getProvider(handle))
+
+    const subscribe = (handle, baseProvider, subscriber) => {
+      const entry = resolve(handle, baseProvider)
+      resolving.add(handle)
+      const result = entry.store.subscribe(subscriber)
+      resolving.delete(handle)
+      return result
+    }
+
+    const container = { subscribe, resolving, get, getProvider }
+
+    const hasOverride = handle => {
+      if (overrides && overrides.has(handle)) return true
+      const entry = get(handle)
+      if (entry) {
+        for (const dep of entry.deps) {
+          if (hasOverride(dep))
+            return true
+
+        }
+      }
+      return false
+    }
+
+    // get & create
+    const pull = (handle, parent) => {
       let entry = registry.get(handle)
       if (!entry) {
-        const deps = new Set()
+        const deps = parent ? new Set(parent.get(handle).deps) : new Set()
         entry = {
+          id: nextId++,
           deps,
-          resolving: (enter = true) => {
-            if (entry.resolved) return
-            entry.resolved = true
-            resolving[enter ? 'add' : 'delete'](handle)
-          },
         }
         registry.set(handle, entry)
       }
@@ -61,26 +79,27 @@ export const createServiceFactory = ({ setContext, getContext }) => {
     }
 
     const resolve = (handle, baseProvider) => {
-      if (parentResolve && !hasOverride(handle)) {
-        return parentResolve(handle, baseProvider)
+      const isLocal = overrides && overrides.has(handle)
+
+      if (parent && !isLocal && !hasOverride(handle)) {
+        return parent.resolve(handle, baseProvider)
       }
 
-      const entry = get(handle)
+      const entry = pull(handle, !isLocal && parent)
 
       if (!entry.store) {
-        const provider = (overrides && overrides.get(handle)) || baseProvider
+        const provider = getProvider(handle) || baseProvider
         entry.store = provider()
       }
 
       resolving.forEach(dep => {
-        const entry = get(dep)
-        entry.deps.add(handle)
+        pull(dep).deps.add(handle)
       })
 
       return entry
     }
 
-    setContext(KEY, resolve)
+    setContext(KEY, Object.assign(container, { resolve, hasOverride }))
   }
 
   return { service, sveltex }

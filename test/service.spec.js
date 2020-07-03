@@ -46,7 +46,7 @@ describe('service', () => {
     }
   })
 
-  test('override', async t => {
+  test('override with get', async t => {
     {
       const a = service('a', () => readable('a'))
       const b = service('b', () => readable('b'))
@@ -77,8 +77,20 @@ describe('service', () => {
             ],
           },
           // 2
-          () => {
-            t.eq(get(ab), 'a b')
+          {
+            init: () => {
+              t.eq(get(ab), 'a b')
+            },
+            children: [
+              // 2.1
+              () => {
+                sveltex([
+                  [a, () => readable('a2.1')],
+                  [b, () => readable('b2.1')],
+                ])
+                t.eq(get(ab), 'a2.1 b2.1')
+              },
+            ],
           },
           // 3
           {
@@ -114,6 +126,198 @@ describe('service', () => {
               },
             ],
           },
+        ],
+      })
+    }
+  })
+
+  const _sub = t => (name, spec, children) => {
+    if (typeof spec === 'function') {
+      const init = () => t.test(String(name), spec)
+      return { init, children }
+    }
+    if (typeof spec.init === 'function') {
+      const fn = spec.init
+      spec.init = () => t.test(String(name), fn)
+    }
+    return spec
+  }
+
+  test('override with subscribe', async t => {
+    {
+      const sub = _sub(t)
+
+      const create_ab = t.spy(() => derived([a, b], vals => vals.join(' ')))
+
+      const a = service('a', () => readable('a'))
+      const b = service('b', () => readable('b'))
+      const ab = service('ab', create_ab)
+
+      await render({
+        init() {
+          sveltex()
+          create_ab.wasNotCalled()
+          t.subscribe(ab, ['a b'])
+          create_ab.wasCalled()
+        },
+        children: [
+          // 0
+          sub(
+            0,
+            t => {
+              t.subscribe(ab, ['a b'])
+              create_ab.wasNotCalled()
+            }
+          ),
+          // 1
+          sub(
+            1,
+            t => {
+              sveltex([[a, () => readable('a1')]])
+              t.subscribe(ab, ['a1 b'])
+              create_ab.wasCalled()
+            },
+            [
+              sub(
+                1.1,
+                t => {
+                  sveltex([[b, () => readable('b1.1')]])
+                  t.subscribe(ab, ['a1 b1.1'])
+                  create_ab.wasCalled()
+                },
+                [
+                  sub('1.1.1', t => {
+                    t.subscribe(ab, ['a1 b1.1'])
+                    create_ab.wasNotCalled()
+                  }),
+                ],
+              ),
+              sub(
+                1.2,
+                t => {
+                  sveltex([[b, () => readable('b1.2')]])
+                  t.subscribe(ab, ['a1 b1.2'])
+                  create_ab.wasCalled()
+                },
+              ),
+            ],
+          ),
+          // 2
+          sub(
+            2,
+            t => {
+              t.subscribe(ab, ['a b'])
+              create_ab.wasNotCalled()
+            },
+            [
+              sub(2.1, t => {
+                sveltex([
+                  [a, () => readable('a2.1')],
+                  [b, () => readable('b2.1')],
+                ])
+                t.subscribe(ab, ['a2.1 b2.1'])
+                create_ab.wasCalled()
+              }),
+            ],
+          ),
+          // 3
+          sub(
+            3,
+            t => {
+              sveltex([[a, () => readable('a3')]])
+              t.subscribe(ab, ['a3 b'])
+              create_ab.wasCalled()
+            },
+            [
+              sub(
+                3.1,
+                t => {
+                  sveltex([[b, () => readable('b3.1')]])
+                  t.subscribe(ab, ['a3 b3.1'])
+                  create_ab.wasCalled()
+                },
+                [
+                  sub(
+                    '3.1.1',
+                    t => {
+                      sveltex([[a, () => readable('a3.1.1')]])
+                      t.subscribe(ab, ['a3.1.1 b3.1'])
+                      create_ab.wasCalled()
+                    },
+                    [
+                      // 3.1.1.1
+                      sub('3.1.1.1', t => {
+                        sveltex([[b, () => readable('b3.1.1.1')]])
+                        t.subscribe(ab, ['a3.1.1 b3.1.1.1'])
+                        create_ab.wasCalled()
+                      }),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      })
+    }
+  })
+
+  test('override with subscribe, change deps', async t => {
+    {
+      const sub = _sub(t)
+
+      const a = service('a', () => readable('a'))
+      const b = service('b', () => readable('b'))
+      const c = service('c', () => readable('c'))
+      const ab = service('ab', () => derived([a, b], vals => vals.join(' ')))
+
+      const create_ab = t.spy(() => derived(a, a => a + a))
+
+      await render({
+        init() {
+          sveltex()
+          t.subscribe(ab, ['a b'])
+        },
+        children: [
+          // 1
+          sub(
+            1,
+            t => {
+              sveltex([
+                //
+                [a, () => readable('a1')],
+                [ab, create_ab],
+              ])
+              create_ab.wasNotCalled()
+              t.subscribe(ab, ['a1a1'])
+              create_ab.wasCalled()
+            },
+            [
+              sub(
+                1.1,
+                t => {
+                  sveltex()
+                  t.subscribe(ab, ['a1a1'])
+                  create_ab.wasNotCalled()
+                },
+                [
+                  sub('1.1.1', t => {
+                    t.subscribe(ab, ['a1a1'])
+                    create_ab.wasNotCalled()
+                  }),
+                ],
+              ),
+              sub(
+                1.2,
+                t => {
+                  sveltex([[b, () => readable('b1.2')]])
+                  t.subscribe(ab, ['a1a1'])
+                  create_ab.wasNotCalled()
+                },
+                [],
+              ),
+            ],
+          ),
         ],
       })
     }

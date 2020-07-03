@@ -17,7 +17,7 @@
     "@rixo/eslint-config-svelte": "^0.9.0",
     "svelte": "^3.23.2",
     "zoar": "^0.0.4",
-    "zorax": "^0.0.8"
+    "zorax": "^0.0.10"
   },
   "dependencies": {},
   "scripts": {
