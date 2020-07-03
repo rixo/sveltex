@@ -1,12 +1,15 @@
 {
   "name": "sveltex",
-  "version": "0.0.7",
+  "version": "0.1.0-0",
   "description": "Minimalistic DI & async friendly stores for Svelte",
   "author": "rixo <rixo@rixo.fr>",
   "license": "MIT",
   "main": "index.js",
   "browser": "index.js",
-  "files": ["index.js", "src"],
+  "files": [
+    "index.js",
+    "src"
+  ],
   "peerDependencies": {
     "svelte": "^3.9.2"
   },
