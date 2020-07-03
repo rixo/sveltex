@@ -48,7 +48,8 @@ The advantage of doing so is that the code dependencies are not hardwired in the
 `services.js`
 
 ```js
-import { service, readable, derived } from 'sveltex'
+import { readable, derived } from 'svelte/store'
+import { service } from 'sveltex'
 
 export const foo = service(() => readable('foo'))
 
