@@ -1,6 +1,6 @@
 {
   "name": "sveltex",
-  "version": "0.1.0-1",
+  "version": "0.1.0-2",
   "description": "Minimalistic DI & async friendly stores for Svelte",
   "author": "rixo <rixo@rixo.fr>",
   "license": "MIT",
