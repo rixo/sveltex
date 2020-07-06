@@ -1,6 +1,8 @@
 const KEY = { context_key: 'sveltex' }
 
-export const createServiceFactory = ({ setContext, getContext }) => {
+export const createServiceFactory = ({
+  svelte: { setContext, getContext },
+}) => {
   let lastId = 0
 
   const nextId = () => ++lastId
@@ -24,19 +26,28 @@ export const createServiceFactory = ({ setContext, getContext }) => {
       strict = false,
     } = opts || {}
 
-    const subscribe = subscriber => {
-      const container = getContext(KEY) || (!strict && placeholder())
-
+    const resolve = () => {
+      let container = getContext(KEY)
       if (!container) {
-        throw new Error(
-          'Tried to resolve service outside of a Sveltex container'
-        )
+        if (strict) {
+          throw new Error(
+            'Tried to resolve service outside of a Sveltex container'
+          )
+        }
+        container = placeholder()
+        setContext(KEY, container)
       }
-
-      return container.subscribe(handle, provider, subscriber)
+      return container
     }
 
-    const handle = { name, subscribe }
+    const subscribe = subscriber =>
+      resolve().subscribe(handle, provider, subscriber)
+
+    const handle = {
+      name,
+      subscribe,
+      set: x => resolve().set(handle, provider, x),
+    }
 
     return handle
   }
@@ -44,24 +55,44 @@ export const createServiceFactory = ({ setContext, getContext }) => {
   // placeholder container, to wait for the sveltex() call in a container
   // component (because autosubs happens before init)
   const placeholder = () => {
-    const queue = []
+    let queue = []
+
+    // ensure a sveltex() container is created at this level (we never want
+    // to resolve late from upper)
+    setTimeout(() => {
+      if (queue) throw new Error('No Sveltex container to resolve the service')
+    })
+
     const subscribe = (...args) => {
       let stoped = false
-      const ctx = { stoped: false, args }
-      queue.push(ctx)
+      const op = { stoped: false, args }
+      queue.push(op)
       return () => {
         if (stoped) return
         stoped = true
-        if (ctx.stop) ctx.stop()
+        if (op.stop) op.stop()
       }
     }
+
+    const set = (...args) => {
+      queue.push({ write: true, args, stoped: false })
+    }
+
     const flush = container => {
-      for (const ctx of queue) {
-        ctx.stop = container.subscribe(...ctx.args)
-        if (ctx.stoped) ctx.stop()
+      if (!queue) return
+      const currentQueue = queue
+      queue = null
+      for (const op of currentQueue) {
+        if (op.write) {
+          container.set(...op.args)
+        } else {
+          op.stop = container.subscribe(...op.args)
+          if (op.stoped) op.stop()
+        }
       }
     }
-    return { isPlaceholder: true, subscribe, flush }
+
+    return { isPlaceholder: true, subscribe, set, flush }
   }
 
   const resolveContext = () => {
@@ -98,7 +129,17 @@ export const createServiceFactory = ({ setContext, getContext }) => {
       return result
     }
 
-    const container = { subscribe, resolving, get, getProvider }
+    const set = (handle, baseProvider, x) => {
+      const entry = resolve(handle, baseProvider)
+      resolving.add(handle)
+      if (!entry.store.set)
+        throw new Error("Can't write to read-only service's store")
+      const result = entry.store.set(x)
+      resolving.delete(handle)
+      return result
+    }
+
+    const container = { subscribe, set, resolving, get, getProvider }
 
     const hasOverride = handle => {
       if (overrides && overrides.has(handle)) return true

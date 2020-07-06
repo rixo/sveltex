@@ -3,12 +3,13 @@
 import { get, derived } from 'svelte/store'
 import { test, describe } from './.zorax.js'
 // import { service, sveltex, readable, derived } from '../index.js'
-import { service, sveltex, readable } from '../index.js'
+import { service, sveltex, readable, writable } from '../index.js'
 
 const { default: App } = require('./App.svelte')
 const {
   default: AutosubContainer,
 } = require('./service/AutosubContainer.svelte')
+const { default: WritableService } = require('./service/WritableService.svelte')
 
 const render = spec => new Promise(resolve => App.render({ spec, resolve }))
 
@@ -376,5 +377,62 @@ describe('service placeholder', () => {
         })
       })
     }
+  })
+
+  test('crashes on mount if sveltex() has not been called', async t => {
+    const foo = service('foo', () => readable('foo'))
+    await new Promise(resolve => {
+      process.once('uncaughtException', err => {
+        t.ok(err && err.message && err.message.includes('No Sveltex container'))
+        resolve()
+      })
+      AutosubContainer.render({
+        sveltex: () => {}, // does not call real sveltex
+        service: foo,
+        answer: () => {},
+      })
+    })
+  })
+})
+
+describe('writable service', () => {
+  // NOTE store.set is never called in SSR (get_store_value instead of
+  // set_store_value), so we can't test this
+  test.skip('sync $service = ...', async t => {
+    const foo = service('foo', () => writable('foo'))
+    await new Promise(resolve => {
+      const result = WritableService.render({
+        sveltex,
+        service: foo,
+        write: 'foot',
+        answerSync: x => {
+          t.eq(x, undefined, 'sync read is immediate')
+        },
+        answer: x => {
+          t.eq(x, 'foot')
+          resolve()
+        },
+      })
+      t.eq(result.html.trim(), '<p>foot</p>')
+    })
+  })
+
+  test('sync service.set(...)', async t => {
+    const foo = service('foo', () => writable('foo'))
+    await new Promise(resolve => {
+      const result = WritableService.render({
+        sveltex,
+        service: foo,
+        set: 'foot',
+        answerSync: x => {
+          t.eq(x, undefined, 'sync read is undefined')
+        },
+        answer: x => {
+          t.eq(x, 'foot')
+          resolve()
+        },
+      })
+      t.eq(result.html.trim(), '<p>foot</p>')
+    })
   })
 })
