@@ -1,22 +1,35 @@
 const KEY = { context_key: 'sveltex' }
 
 export const createServiceFactory = ({ setContext, getContext }) => {
-  let nextId = 0
+  let lastId = 0
 
-  const service = (name, provider) => {
+  const nextId = () => ++lastId
+
+  const service = (opts, provider) => {
+    // service({ name: string }, provider)
     // service(name: string, provider: function)
+    if (typeof opts === 'string') {
+      opts = { name: opts }
+    }
     // service(provider: function)
-    if (typeof name === 'function') {
-      provider = name
-      name = provider.name
+    if (typeof opts === 'function') {
+      provider = opts
+      opts = { name: provider.name }
     }
 
+    const {
+      name,
+      // strict (bool) prevent late resolving (placeholder) -- insures that we
+      // don't inadvertently resolve a dangling placeholder from a parent
+      strict = false,
+    } = opts || {}
+
     const subscribe = subscriber => {
-      const container = getContext(KEY)
+      const container = getContext(KEY) || (!strict && placeholder())
 
       if (!container) {
         throw new Error(
-          'Tried to resolve service outside of a Sveltex container',
+          'Tried to resolve service outside of a Sveltex container'
         )
       }
 
@@ -28,8 +41,44 @@ export const createServiceFactory = ({ setContext, getContext }) => {
     return handle
   }
 
+  // placeholder container, to wait for the sveltex() call in a container
+  // component (because autosubs happens before init)
+  const placeholder = () => {
+    const queue = []
+    const subscribe = (...args) => {
+      let stoped = false
+      const ctx = { stoped: false, args }
+      queue.push(ctx)
+      return () => {
+        if (stoped) return
+        stoped = true
+        if (ctx.stop) ctx.stop()
+      }
+    }
+    const flush = container => {
+      for (const ctx of queue) {
+        ctx.stop = container.subscribe(...ctx.args)
+        if (ctx.stoped) ctx.stop()
+      }
+    }
+    return { isPlaceholder: true, subscribe, flush }
+  }
+
+  const resolveContext = () => {
+    const node = getContext(KEY)
+    if (!node) return {}
+    let placeholder
+    let parent
+    if (node.isPlaceholder) {
+      placeholder = node
+    } else {
+      parent = node
+    }
+    return { placeholder, parent }
+  }
+
   const sveltex = override => {
-    const parent = getContext(KEY)
+    const { placeholder, parent } = resolveContext()
     const registry = new WeakMap()
     const overrides = override && new WeakMap(override)
 
@@ -56,9 +105,7 @@ export const createServiceFactory = ({ setContext, getContext }) => {
       const entry = get(handle)
       if (entry) {
         for (const dep of entry.deps) {
-          if (hasOverride(dep))
-            return true
-
+          if (hasOverride(dep)) return true
         }
       }
       return false
@@ -70,7 +117,7 @@ export const createServiceFactory = ({ setContext, getContext }) => {
       if (!entry) {
         const deps = parent ? new Set(parent.get(handle).deps) : new Set()
         entry = {
-          id: nextId++,
+          id: nextId(),
           deps,
         }
         registry.set(handle, entry)
@@ -100,6 +147,12 @@ export const createServiceFactory = ({ setContext, getContext }) => {
     }
 
     setContext(KEY, Object.assign(container, { resolve, hasOverride }))
+
+    if (placeholder) {
+      placeholder.flush(container)
+    }
+
+    return container
   }
 
   return { service, sveltex }

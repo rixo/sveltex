@@ -1,9 +1,14 @@
+/* eslint-env node */
+
 import { get, derived } from 'svelte/store'
 import { test, describe } from './.zorax.js'
 // import { service, sveltex, readable, derived } from '../index.js'
 import { service, sveltex, readable } from '../index.js'
 
 const { default: App } = require('./App.svelte')
+const {
+  default: AutosubContainer,
+} = require('./service/AutosubContainer.svelte')
 
 const render = spec => new Promise(resolve => App.render({ spec, resolve }))
 
@@ -18,7 +23,7 @@ describe('service', () => {
   })
 
   test('crashes when called outside of container', async t => {
-    const a = service(() => readable(42))
+    const a = service({ strict: true }, () => readable(42))
     await render(() => {
       t.throws(() => {
         get(a)
@@ -162,13 +167,10 @@ describe('service', () => {
         },
         children: [
           // 0
-          sub(
-            0,
-            t => {
-              t.subscribe(ab, ['a b'])
-              create_ab.wasNotCalled()
-            }
-          ),
+          sub(0, t => {
+            t.subscribe(ab, ['a b'])
+            create_ab.wasNotCalled()
+          }),
           // 1
           sub(
             1,
@@ -190,17 +192,14 @@ describe('service', () => {
                     t.subscribe(ab, ['a1 b1.1'])
                     create_ab.wasNotCalled()
                   }),
-                ],
+                ]
               ),
-              sub(
-                1.2,
-                t => {
-                  sveltex([[b, () => readable('b1.2')]])
-                  t.subscribe(ab, ['a1 b1.2'])
-                  create_ab.wasCalled()
-                },
-              ),
-            ],
+              sub(1.2, t => {
+                sveltex([[b, () => readable('b1.2')]])
+                t.subscribe(ab, ['a1 b1.2'])
+                create_ab.wasCalled()
+              }),
+            ]
           ),
           // 2
           sub(
@@ -218,7 +217,7 @@ describe('service', () => {
                 t.subscribe(ab, ['a2.1 b2.1'])
                 create_ab.wasCalled()
               }),
-            ],
+            ]
           ),
           // 3
           sub(
@@ -251,11 +250,11 @@ describe('service', () => {
                         t.subscribe(ab, ['a3.1.1 b3.1.1.1'])
                         create_ab.wasCalled()
                       }),
-                    ],
+                    ]
                   ),
-                ],
+                ]
               ),
-            ],
+            ]
           ),
         ],
       })
@@ -268,7 +267,6 @@ describe('service', () => {
 
       const a = service('a', () => readable('a'))
       const b = service('b', () => readable('b'))
-      const c = service('c', () => readable('c'))
       const ab = service('ab', () => derived([a, b], vals => vals.join(' ')))
 
       const create_ab = t.spy(() => derived(a, a => a + a))
@@ -305,7 +303,7 @@ describe('service', () => {
                     t.subscribe(ab, ['a1a1'])
                     create_ab.wasNotCalled()
                   }),
-                ],
+                ]
               ),
               sub(
                 1.2,
@@ -314,11 +312,68 @@ describe('service', () => {
                   t.subscribe(ab, ['a1a1'])
                   create_ab.wasNotCalled()
                 },
-                [],
+                []
               ),
-            ],
+            ]
           ),
         ],
+      })
+    }
+  })
+})
+
+describe('service placeholder', () => {
+  test('auto creates container when called in empty context', async t => {
+    {
+      const foo = service('foo', () => readable('foo'))
+      await new Promise(resolve => {
+        AutosubContainer.render({
+          sveltex,
+          service: foo,
+          answer: x => {
+            t.eq(x, 'foo')
+            resolve()
+          },
+        })
+      })
+    }
+  })
+
+  test('synchronous read is undefined', async t => {
+    {
+      const foo = service('foo', () => readable('foo'))
+      let n = 0
+      await new Promise(resolve => {
+        AutosubContainer.render({
+          sveltex,
+          service: foo,
+          answerSync: x => {
+            n++
+            t.eq(x, undefined, 'sync read is undefined')
+          },
+          answer: x => {
+            n++
+            t.eq(x, 'foo', 'first async read is defined')
+            t.eq(n, 2, 'expects 2 assertions')
+            resolve()
+          },
+        })
+      })
+    }
+  })
+
+  test('reads overridden service', async t => {
+    {
+      const foo = service('foo', () => readable('foo'))
+      await new Promise(resolve => {
+        AutosubContainer.render({
+          sveltex: () => sveltex([[foo, () => readable('foot')]]),
+          service: foo,
+          answer: x => {
+            t.eq(x, 'foot')
+            resolve()
+          },
+        })
       })
     }
   })
